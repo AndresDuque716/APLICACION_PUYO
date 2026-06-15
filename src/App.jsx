@@ -28,13 +28,87 @@ import {
 } from 'lucide-react';
 
 // Pre-defined products database for scanning simulation & catalog
-const SCAN_PRODUCTS = [
-  { name: 'Inca Kola 500 ml', price: 4.50, avatar: '🥤' },
-  { name: 'Coca Cola 500 ml', price: 4.00, avatar: '🥤' },
-  { name: 'Papas Lays Clásicas', price: 5.00, avatar: '🥔' },
-  { name: 'Chocolate Sublime', price: 3.00, avatar: '🍫' },
-  { name: 'Galletas Oreo', price: 2.50, avatar: '🍪' },
-  { name: 'Agua San Luis 500 ml', price: 2.00, avatar: '💧' }
+const PRODUCT_DATABASE = [
+  {
+    id: "PROD-001",
+    name: "Coca Cola 500 ml",
+    category: "Bebidas",
+    price: 4.0,
+    stock: 45,
+    barcode: "7750101001234",
+    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=600&auto=format&fit=crop",
+    avatar: "🥤"
+  },
+  {
+    id: "PROD-002",
+    name: "Inca Kola 500 ml",
+    category: "Bebidas",
+    price: 4.5,
+    stock: 12,
+    barcode: "7750101005676",
+    image: "https://images.unsplash.com/photo-1543257580-7269da773bf5?q=80&w=600&auto=format&fit=crop",
+    avatar: "🥤"
+  },
+  {
+    id: "PROD-003",
+    name: "Papas Lays Clásicas 25 g",
+    category: "Snacks",
+    price: 2.5,
+    stock: 5,
+    barcode: "7750202003412",
+    image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?q=80&w=600&auto=format&fit=crop",
+    avatar: "🥔"
+  },
+  {
+    id: "PROD-004",
+    name: "Chocolate Sublime Extra",
+    category: "Golosinas",
+    price: 3.0,
+    stock: 28,
+    barcode: "7750303009811",
+    image: "https://images.unsplash.com/photo-1606312619070-d48b4c652a52?q=80&w=600&auto=format&fit=crop",
+    avatar: "🍫"
+  },
+  {
+    id: "PROD-005",
+    name: "Arroz Costeño Extra 1 kg",
+    category: "Abarrotes",
+    price: 4.8,
+    stock: 0,
+    barcode: "7750404001122",
+    image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=600&auto=format&fit=crop",
+    avatar: "🍚"
+  },
+  {
+    id: "PROD-006",
+    name: "Leche Gloria Azul Evaporada",
+    category: "Lácteos",
+    price: 4.2,
+    stock: 19,
+    barcode: "7750505007744",
+    image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop",
+    avatar: "🥛"
+  },
+  {
+    id: "PROD-007",
+    name: "Agua San Mateo Sin Gas 600 ml",
+    category: "Bebidas",
+    price: 2.0,
+    stock: 50,
+    barcode: "7750101009988",
+    image: "https://images.unsplash.com/photo-1608885898957-a599fb1b4641?q=80&w=600&auto=format&fit=crop",
+    avatar: "💧"
+  },
+  {
+    id: "PROD-008",
+    name: "Galletas Casino Chocolate",
+    category: "Golosinas",
+    price: 1.2,
+    stock: 60,
+    barcode: "7750303001155",
+    image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?q=80&w=600&auto=format&fit=crop",
+    avatar: "🍪"
+  }
 ];
 
 // ==========================================
@@ -334,72 +408,73 @@ function DashboardScreen({ onMetaClick }) {
 function ProductosScreen({ onAddProduct }) {
   const [searchQuery, setSearchQuery] = useState('');
   
-  const catalogProducts = [
-    { name: 'Inca Kola 500 ml', price: 4.50, stock: 24, avatar: '🥤', category: 'Bebidas' },
-    { name: 'Coca Cola 500 ml', price: 4.00, stock: 18, avatar: '🥤', category: 'Bebidas' },
-    { name: 'Papas Lays Clásicas', price: 5.00, stock: 5, avatar: '🥔', category: 'Snacks' },
-    { name: 'Chocolate Sublime', price: 3.00, stock: 0, avatar: '🍫', category: 'Golosinas' },
-    { name: 'Galletas Oreo', price: 2.50, stock: 15, avatar: '🍪', category: 'Golosinas' },
-    { name: 'Agua San Luis 500 ml', price: 2.00, stock: 32, avatar: '💧', category: 'Bebidas' }
-  ];
-
-  const filteredProducts = catalogProducts.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProducts = PRODUCT_DATABASE.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.barcode.includes(searchQuery)
   );
 
   return (
     <div style={styles.scrollContent}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={styles.pageTitle}>Catálogo</h2>
-        <button style={{ ...styles.chartPill, padding: '8px 12px', border: '1px solid #222222', borderRadius: '20px', background: '#111', color: '#FFF', fontSize: '12px', cursor: 'pointer' }} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo</button>
+      <div style={styles.headerBiblioteca}>
+        <h2 style={styles.pageTitle}>Biblioteca de Productos</h2>
+        <button style={styles.btnAñadirProducto} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo</button>
       </div>
 
       <div style={styles.searchBarContainer}>
         <Search size={18} style={{ color: '#8E8E93' }} />
         <input 
           type="text" 
-          placeholder="Buscar producto por nombre..." 
+          placeholder="Buscar en el inventario..." 
           style={styles.searchInput} 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {filteredProducts.map((p, index) => (
-          <div key={index} style={{ ...styles.cartItem, justifyContent: 'space-between' }}>
-            <div style={styles.cartItemLeft}>
-              <span style={styles.productAvatar}>{p.avatar}</span>
-              <div>
-                <div style={styles.productName}>{p.name}</div>
-                <div style={styles.productPriceText}>S/ {p.price.toFixed(2)} • Stock: {p.stock} u.</div>
-              </div>
+      <div style={styles.productsLibraryGrid}>
+        {filteredProducts.map((prod) => (
+          <div key={prod.id} style={styles.productCatalogCard}>
+            <div style={styles.imageContainer}>
+              <img src={prod.image} alt={prod.name} style={styles.productCatalogImage} />
+              {prod.stock === 0 && <span style={styles.badgeAgotado}>Agotado</span>}
+              {prod.stock <= 5 && prod.stock > 0 && <span style={styles.badgeBajoStock}>Stock Bajo</span>}
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ 
-                fontSize: '10px', 
-                padding: '4px 8px', 
-                borderRadius: '12px', 
-                backgroundColor: p.stock === 0 ? 'rgba(255, 59, 48, 0.1)' : p.stock <= 5 ? 'rgba(255, 149, 0, 0.1)' : 'rgba(34, 177, 91, 0.1)',
-                color: p.stock === 0 ? '#ff3b30' : p.stock <= 5 ? '#ff9500' : '#22B15B'
-              }}>
-                {p.stock === 0 ? 'Agotado' : p.stock <= 5 ? 'Bajo Stock' : 'Disponible'}
-              </span>
+            
+            <div style={styles.productCatalogInfo}>
+              <span style={styles.productCatalogCategory}>{prod.category}</span>
+              <div style={styles.productCatalogName}>{prod.name}</div>
+              <div style={styles.productCatalogFooterRow}>
+                <span style={styles.productCatalogPrice}>S/ {prod.price.toFixed(2)}</span>
+                <span style={prod.stock === 0 ? styles.stockTextRed : styles.stockTextGeneric}>Cant: {prod.stock}</span>
+              </div>
               <button 
-                style={{ 
-                  backgroundColor: p.stock === 0 ? '#222' : '#22B15B', 
-                  color: '#FFFFFF', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  padding: '8px 12px', 
-                  fontSize: '12px', 
-                  fontWeight: '600', 
-                  cursor: p.stock === 0 ? 'not-allowed' : 'pointer' 
-                }} 
-                onClick={() => p.stock > 0 && onAddProduct(p)}
-                disabled={p.stock === 0}
+                style={{
+                  width: '100%',
+                  marginTop: '10px',
+                  backgroundColor: prod.stock === 0 ? '#222' : '#22B15B',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: prod.stock === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  transition: 'background-color 0.2s'
+                }}
+                disabled={prod.stock === 0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (prod.stock > 0) {
+                    onAddProduct(prod);
+                  }
+                }}
               >
-                +
+                {prod.stock === 0 ? 'Sin Stock' : 'Agregar'}
               </button>
             </div>
           </div>
@@ -637,7 +712,7 @@ export default function VendixApp() {
     setTimeout(() => setFlashActive(false), 250);
 
     // 3. Add random product
-    const randProd = SCAN_PRODUCTS[Math.floor(Math.random() * SCAN_PRODUCTS.length)];
+    const randProd = PRODUCT_DATABASE[Math.floor(Math.random() * PRODUCT_DATABASE.length)];
     setCart(prevCart => {
       const existing = prevCart.find(item => item.name === randProd.name);
       if (existing) {
@@ -692,8 +767,11 @@ export default function VendixApp() {
 
   // Search addition
   const handleSearchAdd = (name) => {
-    const found = SCAN_PRODUCTS.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
-    const productToAdd = found || { name: name, price: 4.50, avatar: '📦' };
+    const found = PRODUCT_DATABASE.find(p => 
+      p.name.toLowerCase().includes(name.toLowerCase()) || 
+      p.barcode === name
+    );
+    const productToAdd = found || { name: name, price: 4.50, avatar: '📦', stock: 10 };
     handleAddProductFromCatalog(productToAdd);
   };
 
@@ -921,6 +999,23 @@ const styles = {
   topNotificationIcon: { fontSize: '20px', cursor: 'pointer' },
   appViewContainer: { flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
   scrollContent: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1200px', margin: '0 auto', width: '100%' },
+  
+  // Biblioteca Grid Styles
+  headerBiblioteca: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  btnAñadirProducto: { backgroundColor: '#22B15B', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' },
+  productsLibraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginTop: '10px' },
+  productCatalogCard: { backgroundColor: '#111111', borderRadius: '16px', border: '1px solid #1C1C1E', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  imageContainer: { width: '100%', height: '120px', position: 'relative', backgroundColor: '#161616' },
+  productCatalogImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  badgeAgotado: { position: 'absolute', top: '8px', left: '8px', backgroundColor: '#FF3B30', color: '#fff', fontSize: '10px', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
+  badgeBajoStock: { position: 'absolute', top: '8px', left: '8px', backgroundColor: '#FF9500', color: '#fff', fontSize: '10px', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
+  productCatalogInfo: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
+  productCatalogCategory: { fontSize: '10px', color: '#8E8E93', textTransform: 'uppercase', fontWeight: 'bold' },
+  productCatalogName: { fontSize: '13px', fontWeight: '600', color: '#FFFFFF', minHeight: '36px' },
+  productCatalogFooterRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' },
+  productCatalogPrice: { fontSize: '14px', fontWeight: '700', color: '#22B15B' },
+  stockTextGeneric: { fontSize: '11px', color: '#8E8E93' },
+  stockTextRed: { fontSize: '11px', color: '#FF3B30', fontWeight: 'bold' },
   
   // Login Styles
   loginContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', minHeight: '85vh' },
