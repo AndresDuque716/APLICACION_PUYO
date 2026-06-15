@@ -98,23 +98,13 @@ function App() {
     e.preventDefault();
     setError('');
 
-    if (!email.trim() || !password) {
-      setError('Por favor, completa todos los campos.');
-      return;
-    }
-
-    if (email.trim() !== 'duque@gmail.com' || password !== '12345678') {
-      setError('Credenciales incorrectas. Verifica tu usuario y contraseña.');
-      return;
-    }
-
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      setLoggedInUser(email);
+      setLoggedInUser(email.trim() || 'duque@gmail.com');
       setLoginSuccess(true);
       setActiveTab('inicio');
-    }, 1800);
+    }, 1000);
   };
 
   const handleGuestLogin = () => {
@@ -352,7 +342,6 @@ function App() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={isLoading || isLoadingGuest}
-                          required 
                           autoComplete="username"
                         />
                       </div>
@@ -374,7 +363,6 @@ function App() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           disabled={isLoading || isLoadingGuest}
-                          required 
                           autoComplete="current-password"
                         />
                       </div>
