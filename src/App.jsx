@@ -921,7 +921,7 @@ export default function VendixApp() {
           />
         )}
         {currentRoute === 'dashboard' && <DashboardScreen onMetaClick={() => setCurrentRoute('scanner')} />}
-        {currentRoute === 'products' && <ProductsScreen onAddProduct={handleAddProductFromCatalog} />}
+        {currentRoute === 'products' && <ProductosScreen onAddProduct={handleAddProductFromCatalog} />}
         {currentRoute === 'sales' && <SalesHistoryScreen />}
         {currentRoute === 'scanner' && (
           <NuevaVentaScreen 
