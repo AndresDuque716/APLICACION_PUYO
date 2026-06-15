@@ -49,7 +49,7 @@ function App() {
   const [error, setError] = useState('');
 
   // App / POS States
-  const [activeTab, setActiveTab] = useState('inicio'); // 'inicio', 'productos', 'nueva-venta', 'ventas', 'mas'
+  const [pantallaActual, setPantallaActual] = useState('inicio'); // 'inicio', 'productos', 'escanear', 'ventas'
   const [flashActive, setFlashActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -103,7 +103,7 @@ function App() {
       setIsLoading(false);
       setLoggedInUser(email.trim() || 'duque@gmail.com');
       setLoginSuccess(true);
-      setActiveTab('inicio');
+      setPantallaActual('inicio');
     }, 1000);
   };
 
@@ -113,7 +113,7 @@ function App() {
       setIsLoadingGuest(false);
       setLoggedInUser('Invitado_Vendix');
       setLoginSuccess(true);
-      setActiveTab('inicio');
+      setPantallaActual('inicio');
     }, 1200);
   };
 
@@ -193,12 +193,6 @@ function App() {
   const discount = subtotal > 10 ? 1.50 : 0.00; // S/ 1.50 discount if subtotal exceeds S/ 10
   const total = subtotal - discount;
 
-  // Render variables
-  const isDashboardTab = activeTab === 'inicio';
-  const isProductsTab = activeTab === 'productos';
-  const isSalesTab = activeTab === 'ventas';
-  const isNewSaleTab = activeTab === 'nueva-venta';
-
   return (
     <>
       {/* Background glow orbs */}
@@ -249,7 +243,7 @@ function App() {
       )}
 
       {/* 2. APP HEADER (Sticky Top) */}
-      {loginSuccess && (
+      {loginSuccess && pantallaActual !== 'escanear' && (
         <header className="app-header">
           <button className="menu-hamburger-btn" onClick={() => setSidebarOpen(true)} aria-label="Abrir menú">
             <Menu size={24} />
@@ -264,190 +258,186 @@ function App() {
         </header>
       )}
 
-      <div className={`container ${loginSuccess ? 'dashboard-mode' : ''}`}>
-        {!loginSuccess ? (
-          <>
-            {/* Brand Section (Left) */}
-            <section className="brand-section">
-                <div className="logo-wrapper">
-                    <img src={logoImg} alt="Vendix Logo" className="logo-img" />
-                    <h1 className="brand-name">Vendix</h1>
-                </div>
-                <p className="slogan">Controla. Vende. Crece.</p>
-                <p className="brand-desc">
-                    El sistema inteligente de gestión de ventas y control de inventarios diseñado para potenciar tu negocio. Simplifica tus operaciones diarias, escanea con códigos QR y mantén el control total desde cualquier dispositivo.
-                </p>
+      {!loginSuccess ? (
+        <div className="container">
+          {/* Brand Section (Left) */}
+          <section className="brand-section">
+              <div className="logo-wrapper">
+                  <img src={logoImg} alt="Vendix Logo" className="logo-img" />
+                  <h1 className="brand-name">Vendix</h1>
+              </div>
+              <p className="slogan">Controla. Vende. Crece.</p>
+              <p className="brand-desc">
+                  El sistema inteligente de gestión de ventas y control de inventarios diseñado para potenciar tu negocio. Simplifica tus operaciones diarias, escanea con códigos QR y mantén el control total desde cualquier dispositivo.
+              </p>
 
-                <div className="feature-list">
-                    <div className="feature-item">
-                        <div className="feature-icon-wrapper">
-                            <TrendingUp size={20} />
-                        </div>
-                        <div className="feature-text">
-                            <h3>Control de Ventas Rápido</h3>
-                            <p>Factura en segundos y realiza un seguimiento automático de tus ingresos diarios.</p>
-                        </div>
-                    </div>
-
-                    <div className="feature-item">
-                        <div className="feature-icon-wrapper">
-                            <Calendar size={20} />
-                        </div>
-                        <div className="feature-text">
-                            <h3>Gestión de Inventario</h3>
-                            <p>Controla existencias, entradas y salidas en tiempo real con soporte para códigos QR.</p>
-                        </div>
-                    </div>
-
-                    <div className="feature-item">
-                        <div className="feature-icon-wrapper">
-                            <AlertCircle size={20} />
-                        </div>
-                        <div className="feature-text">
-                            <h3>Alertas Inteligentes</h3>
-                            <p>Recibe notificaciones automáticas cuando tus productos alcancen el stock mínimo.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Login Card (Right) */}
-            <main className="login-card">
-              <div id="cardContent">
-                <header className="card-header">
-                  <h2>Bienvenido</h2>
-                  <p>Ingresa tus credenciales para acceder a Vendix.</p>
-                </header>
-
-                {error && (
-                  <div className="error-alert">
-                    <AlertCircle size={16} />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit}>
-                  {/* Email / Username Input */}
-                  <div className="form-group">
-                    <div className="input-container">
-                      <span className="input-icon">
-                        <User size={18} />
-                      </span>
-                      <div className="input-field-wrapper">
-                        <span className="input-label">USUARIO / CORREO</span>
-                        <input 
-                          type="text" 
-                          className="input-field" 
-                          placeholder="ejemplo@vendix.com" 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={isLoading || isLoadingGuest}
-                          autoComplete="username"
-                        />
+              <div className="feature-list">
+                  <div className="feature-item">
+                      <div className="feature-icon-wrapper">
+                          <TrendingUp size={20} />
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Password Input */}
-                  <div className="form-group">
-                    <div className="input-container">
-                      <span className="input-icon">
-                        <Lock size={18} />
-                      </span>
-                      <div className="input-field-wrapper">
-                        <span className="input-label">CONTRASEÑA</span>
-                        <input 
-                          type={showPassword ? "text" : "password"} 
-                          className="input-field" 
-                          placeholder="••••••••" 
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={isLoading || isLoadingGuest}
-                          autoComplete="current-password"
-                        />
+                      <div className="feature-text">
+                          <h3>Control de Ventas Rápido</h3>
+                          <p>Factura en segundos y realiza un seguimiento automático de tus ingresos diarios.</p>
                       </div>
-                      <button 
-                        type="button" 
-                        className="btn-toggle-password" 
-                        onClick={() => setShowPassword(!showPassword)}
-                        aria-label="Mostrar u ocultar contraseña"
-                        disabled={isLoading || isLoadingGuest}
-                      >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
                   </div>
 
-                  {/* Options */}
-                  <div className="form-options">
-                    <label className="remember-me">
+                  <div className="feature-item">
+                      <div className="feature-icon-wrapper">
+                          <Calendar size={20} />
+                      </div>
+                      <div className="feature-text">
+                          <h3>Gestión de Inventario</h3>
+                          <p>Controla existencias, entradas y salidas en tiempo real con soporte para códigos QR.</p>
+                      </div>
+                  </div>
+
+                  <div className="feature-item">
+                      <div className="feature-icon-wrapper">
+                          <AlertCircle size={20} />
+                      </div>
+                      <div className="feature-text">
+                          <h3>Alertas Inteligentes</h3>
+                          <p>Recibe notificaciones automáticas cuando tus productos alcancen el stock mínimo.</p>
+                      </div>
+                  </div>
+              </div>
+          </section>
+
+          {/* Login Card (Right) */}
+          <main className="login-card">
+            <div id="cardContent">
+              <header className="card-header">
+                <h2>Bienvenido</h2>
+                <p>Ingresa tus credenciales para acceder a Vendix.</p>
+              </header>
+
+              {error && (
+                <div className="error-alert">
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit}>
+                {/* Email / Username Input */}
+                <div className="form-group">
+                  <div className="input-container">
+                    <span className="input-icon">
+                      <User size={18} />
+                    </span>
+                    <div className="input-field-wrapper">
+                      <span className="input-label">USUARIO / CORREO</span>
                       <input 
-                        type="checkbox" 
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
+                        type="text" 
+                        className="input-field" 
+                        placeholder="ejemplo@vendix.com" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         disabled={isLoading || isLoadingGuest}
+                        autoComplete="username"
                       />
-                      <span>Recordarme</span>
-                    </label>
-                    <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Action Buttons */}
-                  <div className="action-buttons">
-                    <button 
-                      type="submit" 
-                      className={`btn-primary ${isLoading ? 'loading' : ''}`}
-                      disabled={isLoading || isLoadingGuest}
-                    >
-                      {!isLoading ? (
-                        <>
-                          <span className="btn-text">Iniciar Sesión</span>
-                          <ArrowRight size={16} />
-                        </>
-                      ) : (
-                        <span className="spinner"></span>
-                      )}
-                    </button>
-
-                    <div className="divider">o continúa con</div>
-
+                {/* Password Input */}
+                <div className="form-group">
+                  <div className="input-container">
+                    <span className="input-icon">
+                      <Lock size={18} />
+                    </span>
+                    <div className="input-field-wrapper">
+                      <span className="input-label">CONTRASEÑA</span>
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        className="input-field" 
+                        placeholder="••••••••" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading || isLoadingGuest}
+                        autoComplete="current-password"
+                      />
+                    </div>
                     <button 
                       type="button" 
-                      className="btn-secondary"
-                      onClick={handleGuestLogin}
+                      className="btn-toggle-password" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label="Mostrar u ocultar contraseña"
                       disabled={isLoading || isLoadingGuest}
                     >
-                      {isLoadingGuest ? (
-                        <span className="spinner" style={{ borderTopColor: 'var(--color-text-main)' }}></span>
-                      ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="motion-user-icon">
-                            <line x1="2" y1="8" x2="6" y2="8" />
-                            <line x1="2" y1="12" x2="8" y2="12" />
-                            <line x1="2" y1="16" x2="5" y2="16" />
-                            <path d="M19 21v-2a4 4 0 0 0-4-4h-2a4 4 0 0 0-4 4v2" />
-                            <circle cx="14" cy="7" r="4" />
-                          </svg>
-                          <span>Modo Invitado</span>
-                        </>
-                      )}
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                </form>
+                </div>
 
-                <footer className="card-footer">
-                  ¿No tienes cuenta? <a href="#">Registra tu negocio aquí</a>
-                </footer>
-              </div>
-            </main>
-          </>
-        ) : (
-          /* ====================================================
-             Logged In: Vendix Application Dashboard & Sales Views
-             ==================================================== */
-          <>
-            {/* 1. LEFT SIDE PANEL (Dashboard, Products Catalog, or Sales History) */}
-            {(isDashboardTab || (isNewSaleTab && windowWidth > 900)) && (
+                {/* Options */}
+                <div className="form-options">
+                  <label className="remember-me">
+                    <input 
+                      type="checkbox" 
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      disabled={isLoading || isLoadingGuest}
+                    />
+                    <span>Recordarme</span>
+                  </label>
+                  <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="action-buttons">
+                  <button 
+                    type="submit" 
+                    className={`btn-primary ${isLoading ? 'loading' : ''}`}
+                    disabled={isLoading || isLoadingGuest}
+                  >
+                    {!isLoading ? (
+                      <>
+                        <span className="btn-text">Iniciar Sesión</span>
+                        <ArrowRight size={16} />
+                      </>
+                    ) : (
+                      <span className="spinner"></span>
+                    )}
+                  </button>
+
+                  <div className="divider">o continúa con</div>
+
+                  <button 
+                    type="button" 
+                    className="btn-secondary"
+                    onClick={handleGuestLogin}
+                    disabled={isLoading || isLoadingGuest}
+                  >
+                    {isLoadingGuest ? (
+                      <span className="spinner" style={{ borderTopColor: 'var(--color-text-main)' }}></span>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="motion-user-icon">
+                          <line x1="2" y1="8" x2="6" y2="8" />
+                          <line x1="2" y1="12" x2="8" y2="12" />
+                          <line x1="2" y1="16" x2="5" y2="16" />
+                          <path d="M19 21v-2a4 4 0 0 0-4-4h-2a4 4 0 0 0-4 4v2" />
+                          <circle cx="14" cy="7" r="4" />
+                        </svg>
+                        <span>Modo Invitado</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <footer className="card-footer">
+                ¿No tienes cuenta? <a href="#">Registra tu negocio aquí</a>
+              </footer>
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="app-container">
+          <main className="main-content">
+            {pantallaActual === 'inicio' && (
               <div className="dashboard-view">
                 <div className="section-title-bar">
                   <h2>Dashboard Principal</h2>
@@ -586,8 +576,7 @@ function App() {
               </div>
             )}
 
-            {/* 2. PRODUCTS CATALOG VIEW */}
-            {isProductsTab && (
+            {pantallaActual === 'productos' && (
               <div className="products-view">
                 <div className="section-title-bar">
                   <h2>Catálogo de Productos</h2>
@@ -667,8 +656,7 @@ function App() {
               </div>
             )}
 
-            {/* 3. SALES HISTORY VIEW */}
-            {isSalesTab && (
+            {pantallaActual === 'ventas' && (
               <div className="sales-history-view">
                 <div className="section-title-bar">
                   <h2>Historial de Ventas</h2>
@@ -721,9 +709,8 @@ function App() {
               </div>
             )}
 
-            {/* 4. RIGHT SIDE PANEL (POS/New Sale) */}
-            {(isNewSaleTab || windowWidth > 900) && (
-              <div className={`pos-view ${isNewSaleTab ? '' : 'desktop-only'}`}>
+            {pantallaActual === 'escanear' && (
+              <div className="pos-view">
                 <div className="section-title-bar">
                   <h2>Módulo de Nueva Venta</h2>
                 </div>
@@ -797,53 +784,61 @@ function App() {
                 </div>
               </div>
             )}
+          </main>
 
-            {/* 5. COMMON BOTTOM NAVIGATION BAR */}
-            <nav className="bottom-nav">
-              <button 
-                className={`nav-item ${activeTab === 'inicio' ? 'active' : ''}`}
-                onClick={() => setActiveTab('inicio')}
-              >
-                <HomeIcon size={20} />
-                <span>Inicio</span>
-              </button>
+          {/* 5. COMMON BOTTOM NAVIGATION BAR */}
+          <nav className="bottom-nav">
+            <button 
+              className={`nav-item ${pantallaActual === 'inicio' ? 'active' : ''}`}
+              onClick={() => setPantallaActual('inicio')}
+            >
+              <HomeIcon size={20} />
+              <span>Inicio</span>
+            </button>
 
-              <button 
-                className={`nav-item ${activeTab === 'productos' ? 'active' : ''}`}
-                onClick={() => setActiveTab('productos')}
-              >
-                <Package size={20} />
-                <span>Productos</span>
-              </button>
+            <button 
+              className={`nav-item ${pantallaActual === 'productos' ? 'active' : ''}`}
+              onClick={() => setPantallaActual('productos')}
+            >
+              <Package size={20} />
+              <span>Productos</span>
+            </button>
 
-              {/* Botón Central de Nueva Venta */}
-              <button 
-                className="btn-floating-action"
-                onClick={() => {
-                  setActiveTab('nueva-venta');
-                }}
-                aria-label="Nueva Venta"
-              >
-                <Plus size={28} />
-              </button>
+            {/* Botón Central de Nueva Venta */}
+            <button 
+              className="btn-floating-action"
+              onClick={() => setPantallaActual('escanear')}
+              aria-label="Nueva Venta"
+            >
+              <Plus size={28} />
+            </button>
 
-              <button 
-                className={`nav-item ${activeTab === 'ventas' ? 'active' : ''}`}
-                onClick={() => setActiveTab('ventas')}
-              >
-                <Receipt size={20} />
-                <span>Ventas</span>
-              </button>
+            <button 
+              className={`nav-item ${pantallaActual === 'ventas' ? 'active' : ''}`}
+              onClick={() => setPantallaActual('ventas')}
+            >
+              <Receipt size={20} />
+              <span>Ventas</span>
+            </button>
 
-              {/* NUEVO: Botón de Escáner Directo */}
-              <button className="nav-item active-green" onClick={handleScan} aria-label="Escanear producto rápido">
-                <Scan size={22} />
-                <span>Escanear</span>
-              </button>
-            </nav>
-          </>
-        )}
-      </div>
+            {/* Botón de Escáner Directo */}
+            <button 
+              className={`nav-item ${pantallaActual === 'escanear' ? 'active-green' : ''}`}
+              onClick={() => {
+                if (pantallaActual !== 'escanear') {
+                  setPantallaActual('escanear');
+                } else {
+                  handleScan();
+                }
+              }}
+              aria-label="Escanear producto rápido"
+            >
+              <Scan size={22} />
+              <span>Escanear</span>
+            </button>
+          </nav>
+        </div>
+      )}
     </>
   );
 }
