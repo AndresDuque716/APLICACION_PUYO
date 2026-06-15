@@ -144,8 +144,85 @@ function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword })
 // 2. COMPONENTE: DASHBOARD (Vista de Inicio)
 // ==========================================
 function DashboardScreen({ onMetaClick }) {
+  const containerRef = React.useRef(null);
+  const [overscrollY, setOverscrollY] = useState(0);
+  const [isBouncing, setIsBouncing] = useState(false);
+
+  const touchLastY = React.useRef(0);
+  const touchStartY = React.useRef(0);
+  const isAtBoundary = React.useRef(null); // 'top', 'bottom', or null
+
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchLastY.current = e.touches[0].clientY;
+    isAtBoundary.current = null;
+    setIsBouncing(false);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const currentY = e.touches[0].clientY;
+    
+    const isPullingDown = currentY > touchLastY.current;
+    const isPullingUp = currentY < touchLastY.current;
+
+    // Check boundary limits with 2px tolerance
+    const isAtTop = scrollTop <= 2;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 2;
+
+    if (isAtTop && isPullingDown) {
+      if (isAtBoundary.current !== 'top') {
+        isAtBoundary.current = 'top';
+        touchStartY.current = currentY;
+      }
+      const diff = currentY - touchStartY.current;
+      setOverscrollY(diff * 0.25);
+      if (e.cancelable) e.preventDefault();
+    } else if (isAtBottom && isPullingUp) {
+      if (isAtBoundary.current !== 'bottom') {
+        isAtBoundary.current = 'bottom';
+        touchStartY.current = currentY;
+      }
+      const diff = currentY - touchStartY.current;
+      setOverscrollY(diff * 0.25);
+      if (e.cancelable) e.preventDefault();
+    } else {
+      if (isAtBoundary.current === 'top' && currentY < touchStartY.current) {
+        isAtBoundary.current = null;
+        setOverscrollY(0);
+      } else if (isAtBoundary.current === 'bottom' && currentY > touchStartY.current) {
+        isAtBoundary.current = null;
+        setOverscrollY(0);
+      } else if (!isAtBoundary.current) {
+        setOverscrollY(0);
+      }
+    }
+    
+    touchLastY.current = currentY;
+  };
+
+  const handleTouchEnd = () => {
+    setIsBouncing(true);
+    setOverscrollY(0);
+    isAtBoundary.current = null;
+  };
+
   return (
-    <div style={styles.scrollContent}>
+    <div 
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        ...styles.scrollContent,
+        height: 'calc(100dvh - 130px)',
+        overflowY: 'auto',
+        overscrollBehaviorY: 'contain',
+        transform: `translateY(${overscrollY}px)`,
+        transition: isBouncing ? 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none'
+      }}
+    >
       <h2 style={styles.pageTitle}>Dashboard Principal</h2>
       
       {/* Grid de KPIs */}
@@ -209,6 +286,42 @@ function DashboardScreen({ onMetaClick }) {
             <circle cx="240" cy="30" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
             <circle cx="300" cy="20" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
           </svg>
+        </div>
+      </div>
+
+      {/* Sección de Alertas Rápidas (Stock Bajo, Agotados, Cajas, Clientes) */}
+      <h3 style={styles.sectionHeader}>Alertas y Cajas</h3>
+      <div className="quick-info-grid">
+        <div className="alert-card warning">
+          <div className="alert-icon-box">
+            <AlertCircle size={16} />
+          </div>
+          <h4>Stock Bajo</h4>
+          <span className="alert-num">5</span>
+        </div>
+
+        <div className="alert-card danger">
+          <div className="alert-icon-box">
+            <AlertCircle size={16} />
+          </div>
+          <h4>Agotados</h4>
+          <span className="alert-num">2</span>
+        </div>
+
+        <div className="alert-card info">
+          <div className="alert-icon-box">
+            <User size={16} />
+          </div>
+          <h4>Cajas</h4>
+          <span className="alert-num">2</span>
+        </div>
+
+        <div className="alert-card success">
+          <div className="alert-icon-box">
+            <Check size={16} />
+          </div>
+          <h4>Clientes</h4>
+          <span className="alert-num">48</span>
         </div>
       </div>
     </div>
@@ -712,7 +825,11 @@ export default function VendixApp() {
       )}
 
       {/* ESPACIO DE RENDERIZADO DE PANTALLAS */}
-      <main style={styles.appViewContainer}>
+      <main style={{
+        ...styles.appViewContainer,
+        overflowY: currentRoute === 'dashboard' ? 'hidden' : 'auto',
+        paddingBottom: (currentRoute === 'dashboard' || currentRoute === 'login') ? '0px' : '90px'
+      }}>
         {currentRoute === 'login' && (
           <LoginScreen 
             email={email}
@@ -797,12 +914,12 @@ export default function VendixApp() {
 // 7. OBJETO DE ESTILOS CSS EN LÍNEA (JS)
 // ==========================================
 const styles = {
-  deviceViewport: { backgroundColor: '#080808', color: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflowX: 'hidden' },
+  deviceViewport: { backgroundColor: '#080808', color: '#FFFFFF', height: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: 'hidden' },
   navbarTop: { height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', backgroundColor: '#080808', borderBottom: '1px solid #141414', position: 'sticky', top: 0, zIndex: 10 },
   hamburgerBtn: { background: 'none', border: 'none', color: '#FFFFFF', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
   topBarLogoName: { fontSize: '20px', fontWeight: 'bold', letterSpacing: '0.5px' },
   topNotificationIcon: { fontSize: '20px', cursor: 'pointer' },
-  appViewContainer: { flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: '90px' },
+  appViewContainer: { flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
   scrollContent: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1200px', margin: '0 auto', width: '100%' },
   
   // Login Styles
