@@ -1895,4 +1895,27 @@ body {
     color: var(--color-text-main);
 }
 
+/* Responsive layout for desktop/tablet screens */
+@media (min-width: 480px) {
+    #root:has(.app-container) {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 24px;
+        background-color: #030303;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+    }
 
+    .app-container {
+        width: 100%;
+        max-width: 430px; /* Width of a premium Pro Max smartphone */
+        height: 100%;
+        max-height: 880px; /* Max height to fit within standard desktop viewport */
+        border-radius: 36px;
+        border: 4px solid #1c1c1e;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 168, 89, 0.15);
+        position: relative;
+    }
+}

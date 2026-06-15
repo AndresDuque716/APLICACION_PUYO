@@ -216,7 +216,7 @@ function DashboardScreen({ onMetaClick }) {
       onTouchEnd={handleTouchEnd}
       style={{
         ...styles.scrollContent,
-        height: 'calc(100dvh - 130px)',
+        height: 'calc(100% - 70px)',
         overflowY: 'auto',
         overscrollBehaviorY: 'contain',
         transform: `translateY(${overscrollY}px)`,
