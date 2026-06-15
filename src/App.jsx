@@ -405,23 +405,266 @@ function DashboardScreen({ onMetaClick }) {
 }
 
 // ==========================================
+// 8. COMPONENTE: FORMULARIO NUEVO PRODUCTO
+// ==========================================
+function NuevoProductoScreen({ onSave, onCancel }) {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Bebidas');
+  const [barcode, setBarcode] = useState('');
+  const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('');
+  const [image, setImage] = useState('');
+
+  const handleBarcodeGenerate = () => {
+    const code = "775" + Math.floor(1000000000 + Math.random() * 9000000000);
+    setBarcode(code);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      alert('Por favor, ingresa el nombre del producto.');
+      return;
+    }
+    if (!price || parseFloat(price) < 0) {
+      alert('Por favor, ingresa un precio de venta válido.');
+      return;
+    }
+    if (!stock || parseInt(stock) < 0) {
+      alert('Por favor, ingresa un stock válido.');
+      return;
+    }
+
+    const categoryAvatars = {
+      Bebidas: '🥤',
+      Snacks: '🥔',
+      Golosinas: '🍫',
+      Abarrotes: '🍚',
+      Lácteos: '🥛',
+      Limpieza: '🧼',
+      Librería: '📓',
+      Otro: '📦'
+    };
+
+    const categoryImages = {
+      Bebidas: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=600&auto=format&fit=crop',
+      Snacks: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?q=80&w=600&auto=format&fit=crop',
+      Golosinas: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?q=80&w=600&auto=format&fit=crop',
+      Abarrotes: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=600&auto=format&fit=crop',
+      Lácteos: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop',
+      Limpieza: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?q=80&w=600&auto=format&fit=crop',
+      Librería: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=600&auto=format&fit=crop',
+      Otro: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=600&auto=format&fit=crop'
+    };
+
+    const finalImage = image.trim() || categoryImages[category] || categoryImages.Otro;
+    const finalBarcode = barcode.trim() || "775" + Math.floor(1000000000 + Math.random() * 9000000000);
+
+    const newProd = {
+      id: "PROD-" + Date.now().toString().slice(-4),
+      name: name.trim(),
+      category: category,
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      barcode: finalBarcode,
+      image: finalImage,
+      avatar: categoryAvatars[category] || '📦'
+    };
+
+    onSave(newProd);
+  };
+
+  return (
+    <div style={styles.scrollContent}>
+      <div style={styles.headerBiblioteca}>
+        <div>
+          <h2 style={styles.pageTitle}>Nuevo producto</h2>
+          <span style={styles.subtextHeader}>Registra un nuevo artículo en tu inventario</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '4px' }}>
+        <div style={{
+          backgroundColor: '#111111',
+          border: '1px dashed #22B15B',
+          borderRadius: '16px',
+          height: '140px',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
+          cursor: 'pointer'
+        }} onClick={() => {
+          const url = prompt('Ingresa la URL de la imagen del producto:');
+          if (url) setImage(url);
+        }}>
+          {image ? (
+            <>
+              <img src={image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: '#22B15B',
+                fontSize: '11px',
+                textAlign: 'center',
+                padding: '6px',
+                fontWeight: '600'
+              }}>
+                Cambiar imagen
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#8E8E93' }}>
+              <Camera size={28} style={{ color: '#22B15B' }} />
+              <span style={{ fontSize: '13px', fontWeight: '500' }}>+ Cargar imagen del producto</span>
+              <span style={{ fontSize: '10px', color: '#48484A' }}>Opcional (se asignará una por defecto)</span>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.inputLabel}>NOMBRE DEL PRODUCTO</label>
+          <input 
+            type="text" 
+            placeholder="Ej. Coca Cola 1L" 
+            style={styles.inputField} 
+            value={name} 
+            onChange={(e) => setName(e.target.value)} 
+            required
+          />
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.inputLabel}>CATEGORÍA</label>
+          <select 
+            style={{
+              ...styles.inputField,
+              backgroundColor: '#161616',
+              color: '#FFFFFF',
+              border: '1px solid #222222',
+              appearance: 'none',
+              cursor: 'pointer'
+            }}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="Bebidas">Bebidas</option>
+            <option value="Snacks">Snacks</option>
+            <option value="Golosinas">Golosinas</option>
+            <option value="Abarrotes">Abarrotes</option>
+            <option value="Lácteos">Lácteos</option>
+            <option value="Limpieza">Limpieza</option>
+            <option value="Librería">Librería</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.inputLabel}>CÓDIGO DE BARRAS / SKU</label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input 
+              type="text" 
+              placeholder="Ej. 7750101001234" 
+              style={{ ...styles.inputField, flex: 1 }} 
+              value={barcode} 
+              onChange={(e) => setBarcode(e.target.value)} 
+            />
+            <button 
+              type="button" 
+              onClick={handleBarcodeGenerate}
+              style={{
+                backgroundColor: '#111111',
+                border: '1px solid #22B15B',
+                color: '#22B15B',
+                borderRadius: '12px',
+                padding: '0 16px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Generar
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ ...styles.inputGroup, flex: 1 }}>
+            <label style={styles.inputLabel}>PRECIO DE VENTA (S/)</label>
+            <input 
+              type="number" 
+              step="0.10" 
+              placeholder="0.00" 
+              style={styles.inputField} 
+              value={price} 
+              onChange={(e) => setPrice(e.target.value)} 
+              required
+            />
+          </div>
+          <div style={{ ...styles.inputGroup, flex: 1 }}>
+            <label style={styles.inputLabel}>STOCK INICIAL</label>
+            <input 
+              type="number" 
+              placeholder="0" 
+              style={styles.inputField} 
+              value={stock} 
+              onChange={(e) => setStock(e.target.value)} 
+              required
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+          <button type="submit" style={styles.btnPrimaryAction}>
+            Guardar producto
+          </button>
+          <button 
+            type="button" 
+            onClick={onCancel}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#8E8E93',
+              border: '1px solid #222222',
+              borderRadius: '16px',
+              padding: '16px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              textAlign: 'center'
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ==========================================
 // 3. COMPONENTE: CATÁLOGO DE PRODUCTOS
 // ==========================================
-function ProductosScreen({ onAddProduct }) {
+function ProductosScreen({ products, onAddProduct, onNewProductClick }) {
   const [categoriaActiva, setCategoriaActiva] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Compute category counts dynamically based on PRODUCT_DATABASE
+  // Compute category counts dynamically based on products state
   const categorias = [
-    { nombre: 'Todos', cant: PRODUCT_DATABASE.length },
-    { nombre: 'Bebidas', cant: PRODUCT_DATABASE.filter(p => p.category === 'Bebidas').length },
-    { nombre: 'Snacks', cant: PRODUCT_DATABASE.filter(p => p.category === 'Snacks').length },
-    { nombre: 'Golosinas', cant: PRODUCT_DATABASE.filter(p => p.category === 'Golosinas').length },
-    { nombre: 'Abarrotes', cant: PRODUCT_DATABASE.filter(p => p.category === 'Abarrotes').length },
-    { nombre: 'Lácteos', cant: PRODUCT_DATABASE.filter(p => p.category === 'Lácteos').length }
+    { nombre: 'Todos', cant: products.length },
+    { nombre: 'Bebidas', cant: products.filter(p => p.category === 'Bebidas').length },
+    { nombre: 'Snacks', cant: products.filter(p => p.category === 'Snacks').length },
+    { nombre: 'Golosinas', cant: products.filter(p => p.category === 'Golosinas').length },
+    { nombre: 'Abarrotes', cant: products.filter(p => p.category === 'Abarrotes').length },
+    { nombre: 'Lácteos', cant: products.filter(p => p.category === 'Lácteos').length }
   ];
 
-  const filteredProducts = PRODUCT_DATABASE.filter(p => {
+  const filteredProducts = products.filter(p => {
     const matchesCategory = categoriaActiva === 'Todos' || p.category === categoriaActiva;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -435,9 +678,9 @@ function ProductosScreen({ onAddProduct }) {
       <div style={styles.headerBiblioteca}>
         <div>
           <h2 style={styles.pageTitle}>Productos</h2>
-          <span style={styles.subtextHeader}>Total: {PRODUCT_DATABASE.length} productos</span>
+          <span style={styles.subtextHeader}>Total: {products.length} productos</span>
         </div>
-        <button style={styles.btnAñadirProducto} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo producto</button>
+        <button style={styles.btnAñadirProducto} onClick={onNewProductClick}>+ Nuevo producto</button>
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
@@ -725,6 +968,7 @@ function NuevaVentaScreen({ cart, onAddQty, onSubQty, onDeleteItem, onScanClick,
 // ==========================================
 export default function VendixApp() {
   const [currentRoute, setCurrentRoute] = useState('login'); // 'login', 'dashboard', 'scanner', 'products', 'sales'
+  const [products, setProducts] = useState(PRODUCT_DATABASE);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loggedInUser, setLoggedInUser] = useState('');
@@ -763,7 +1007,7 @@ export default function VendixApp() {
     setTimeout(() => setFlashActive(false), 250);
 
     // 3. Add random product
-    const randProd = PRODUCT_DATABASE[Math.floor(Math.random() * PRODUCT_DATABASE.length)];
+    const randProd = products[Math.floor(Math.random() * products.length)];
     setCart(prevCart => {
       const existing = prevCart.find(item => item.name === randProd.name);
       if (existing) {
@@ -818,7 +1062,7 @@ export default function VendixApp() {
 
   // Search addition
   const handleSearchAdd = (name) => {
-    const found = PRODUCT_DATABASE.find(p => 
+    const found = products.find(p => 
       p.name.toLowerCase().includes(name.toLowerCase()) || 
       p.barcode === name
     );
@@ -847,8 +1091,8 @@ export default function VendixApp() {
 
   return (
     <div style={styles.deviceViewport} className="app-container">
-      {/* HEADER PRINCIPAL (Oculto en Login o en Venta Completa Escáner) */}
-      {currentRoute !== 'login' && currentRoute !== 'scanner' && (
+      {/* HEADER PRINCIPAL (Oculto en Login o en Venta Completa Escáner o Nuevo Producto) */}
+      {currentRoute !== 'login' && currentRoute !== 'scanner' && currentRoute !== 'new-product' && (
         <header style={styles.navbarTop} className="app-header">
           {/* 3 RAYITAS ARRIBA A LA IZQUIERDA */}
           <button style={styles.hamburgerBtn} onClick={() => setSidebarOpen(true)}>
@@ -957,7 +1201,7 @@ export default function VendixApp() {
       <main style={{
         ...styles.appViewContainer,
         overflowY: currentRoute === 'dashboard' ? 'hidden' : 'auto',
-        paddingBottom: (currentRoute === 'dashboard' || currentRoute === 'login') ? '0px' : '90px'
+        paddingBottom: (currentRoute === 'dashboard' || currentRoute === 'login' || currentRoute === 'new-product') ? '0px' : '90px'
       }}>
         {currentRoute === 'login' && (
           <LoginScreen 
@@ -972,7 +1216,22 @@ export default function VendixApp() {
           />
         )}
         {currentRoute === 'dashboard' && <DashboardScreen onMetaClick={() => setCurrentRoute('scanner')} />}
-        {currentRoute === 'products' && <ProductosScreen onAddProduct={handleAddProductFromCatalog} />}
+        {currentRoute === 'products' && (
+          <ProductosScreen 
+            products={products}
+            onAddProduct={handleAddProductFromCatalog} 
+            onNewProductClick={() => setCurrentRoute('new-product')} 
+          />
+        )}
+        {currentRoute === 'new-product' && (
+          <NuevoProductoScreen 
+            onSave={(newProd) => {
+              setProducts(prev => [newProd, ...prev]);
+              setCurrentRoute('products');
+            }}
+            onCancel={() => setCurrentRoute('products')}
+          />
+        )}
         {currentRoute === 'sales' && <SalesHistoryScreen />}
         {currentRoute === 'scanner' && (
           <NuevaVentaScreen 
@@ -987,8 +1246,8 @@ export default function VendixApp() {
         )}
       </main>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR (Oculta en Login) */}
-      {currentRoute !== 'login' && (
+      {/* BARRA DE NAVEGACIÓN INFERIOR (Oculta en Login o Nuevo Producto) */}
+      {currentRoute !== 'login' && currentRoute !== 'new-product' && (
         <nav style={styles.bottomTabNavigation}>
           <button 
             style={currentRoute === 'dashboard' ? styles.tabItemActive : styles.tabItem} 
