@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import logoImg from './assets/logo.png';
 import { 
   User, 
@@ -23,129 +23,484 @@ import {
   Scan,
   X,
   Receipt,
-  Search
+  Search,
+  Minus
 } from 'lucide-react';
 
-// Pre-defined products database for scanning simulation
+// Pre-defined products database for scanning simulation & catalog
 const SCAN_PRODUCTS = [
-  { name: 'Galletas Oreo', price: 2.50, avatar: '🍪' },
+  { name: 'Inca Kola 500 ml', price: 4.50, avatar: '🥤' },
+  { name: 'Coca Cola 500 ml', price: 4.00, avatar: '🥤' },
+  { name: 'Papas Lays Clásicas', price: 5.00, avatar: '🥔' },
   { name: 'Chocolate Sublime', price: 3.00, avatar: '🍫' },
-  { name: 'Gaseosa Sprite', price: 3.50, avatar: '🥤' },
-  { name: 'Agua San Luis', price: 2.00, avatar: '💧' },
-  { name: 'Papas Nativas Lays', price: 5.00, avatar: '🥔' },
-  { name: 'Sublime Extremo', price: 4.50, avatar: '🍫' }
+  { name: 'Galletas Oreo', price: 2.50, avatar: '🍪' },
+  { name: 'Agua San Luis 500 ml', price: 2.00, avatar: '💧' }
 ];
 
-function App() {
-  // Login states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+// ==========================================
+// 1. COMPONENTE: LOGIN (Pantalla de Acceso)
+// ==========================================
+function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingGuest, setIsLoadingGuest] = useState(false);
-  const [loginSuccess, setLoginSuccess] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState('');
-  const [error, setError] = useState('');
 
-  // App / POS States
-  const [pantallaActual, setPantallaActual] = useState('inicio'); // 'inicio', 'productos', 'escanear', 'ventas'
-  const [flashActive, setFlashActive] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [cart, setCart] = useState([
-    { id: 1, name: 'Inca Kola 500ml', price: 3.50, qty: 2, avatar: '🥤' },
-    { id: 2, name: 'Coca Cola 500ml', price: 3.50, qty: 1, avatar: '🥤' },
-    { id: 3, name: 'Papas Lays Clásicas', price: 4.50, qty: 1, avatar: '🥔' }
-  ]);
-
-  useEffect(() => {
-    // Catch unhandled promise rejections globally to prevent console crashes
-    const handleRejection = (event) => {
-      console.warn(`Captured unhandled promise rejection: ${event.reason}`);
-      event.preventDefault();
-    };
-    window.addEventListener('unhandledrejection', handleRejection);
-
-    // Resize listener
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-
-    // Simulated Locize backend loading log for translations
-    console.log('[i18next] Initializing Locize backend...');
-    const loadTranslations = new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ es: { welcome: "Bienvenido" } });
-      }, 300);
-    });
-
-    loadTranslations
-      .then(() => {
-        console.log('[i18next] Translations loaded successfully for language: es from Locize.');
-      })
-      .catch((error) => {
-        console.error('[i18next] Error loading translations:', error);
-      });
-
-    return () => {
-      window.removeEventListener('unhandledrejection', handleRejection);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  // Handlers for Login
-  const handleSubmit = (e) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
-    setError('');
-
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      setLoggedInUser(email.trim() || 'duque@gmail.com');
-      setLoginSuccess(true);
-      setPantallaActual('inicio');
+      onLoginSuccess();
     }, 1000);
   };
 
-  const handleGuestLogin = () => {
-    setIsLoadingGuest(true);
-    setTimeout(() => {
-      setIsLoadingGuest(false);
-      setLoggedInUser('Invitado_Vendix');
-      setLoginSuccess(true);
-      setPantallaActual('inicio');
-    }, 1200);
+  return (
+    <div style={styles.loginContainer}>
+      <div style={styles.brandHeader}>
+        <div style={styles.logoWrapper}>
+          <img src={logoImg} alt="Vendix Logo" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
+          <h1 style={styles.logoText}>Vendix</h1>
+        </div>
+        <p style={styles.slogan}>Controla. Vende. Crece.</p>
+      </div>
+
+      <div style={styles.loginCard}>
+        <h2 style={styles.cardTitle}>Bienvenido</h2>
+        <p style={styles.cardSubtitle}>Ingresa tus credenciales para acceder a Vendix.</p>
+        
+        <form onSubmit={handleFormSubmit}>
+          <div style={styles.inputGroup}>
+            <label style={styles.inputLabel}>USUARIO / CORREO</label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: '14px', color: '#8E8E93', display: 'flex', alignItems: 'center' }}><User size={18} /></span>
+              <input 
+                type="text" 
+                placeholder="ejemplo@vendix.com" 
+                style={{ ...styles.inputField, paddingLeft: '42px' }} 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={styles.inputGroup}>
+            <label style={styles.inputLabel}>CONTRASEÑA</label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: '14px', color: '#8E8E93', display: 'flex', alignItems: 'center' }}><Lock size={18} /></span>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                placeholder="••••••••" 
+                style={{ ...styles.inputField, paddingLeft: '42px', paddingRight: '42px' }} 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '14px', background: 'none', border: 'none', color: '#8E8E93', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.rowUtilities}>
+            <label style={styles.checkboxLabel}>
+              <input type="checkbox" defaultChecked style={styles.checkbox} /> Recordarme
+            </label>
+            <span style={styles.linkText} onClick={() => alert('Recuperación de contraseña en desarrollo.')}>¿Olvidaste tu contraseña?</span>
+          </div>
+
+          <button type="submit" style={styles.btnPrimary} disabled={isLoading}>
+            {isLoading ? 'Cargando...' : 'Iniciar Sesión'}
+          </button>
+        </form>
+
+        <div style={styles.dividerRow}>
+          <div style={styles.dividerLine}></div>
+          <span style={styles.dividerText}>o continúa con</span>
+          <div style={styles.dividerLine}></div>
+        </div>
+
+        <button style={styles.btnSecondary} onClick={() => {
+          setEmail('invitado@vendix.com');
+          onLoginSuccess();
+        }}>
+           Modo Invitado
+        </button>
+
+        <p style={styles.registerText}>
+          ¿No tienes cuenta? <span style={styles.linkTextHighlight} onClick={() => alert('Registro disponible pronto.')}>Registra tu negocio aquí</span>
+        </p>
+      </div>
+      
+      <div style={styles.securityFooter}>
+         <Check size={14} style={{ color: '#00A859', marginRight: '4px' }} /> Tu información está segura con nosotros
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 2. COMPONENTE: DASHBOARD (Vista de Inicio)
+// ==========================================
+function DashboardScreen({ onMetaClick }) {
+  return (
+    <div style={styles.scrollContent}>
+      <h2 style={styles.pageTitle}>Dashboard Principal</h2>
+      
+      {/* Grid de KPIs */}
+      <div style={styles.kpiGrid}>
+        <div style={styles.kpiCard}>
+          <span style={styles.kpiTitle}>Ventas de Hoy</span>
+          <span style={styles.kpiMainValue}>S/ 1,240.00</span>
+          <span style={styles.trendUp}>
+            <TrendingUp size={11} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'middle' }} /> +12.5% 
+          </span>
+        </div>
+        <div style={styles.kpiCard}>
+          <span style={styles.kpiTitle}>Transacciones</span>
+          <span style={styles.kpiMainValue}>84</span>
+          <span style={styles.trendUp}>
+            <TrendingUp size={11} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'middle' }} /> +8.3% 
+          </span>
+        </div>
+        <div style={styles.kpiCard}>
+          <span style={styles.kpiTitle}>Ticket Promedio</span>
+          <span style={styles.kpiMainValue}>S/ 14.80</span>
+          <span style={styles.statusStable}>Estable</span>
+        </div>
+      </div>
+
+      {/* Banner de Logro */}
+      <div style={styles.achievementBanner} onClick={onMetaClick}>
+        <div style={styles.bannerIconBox}>
+          <ShoppingBag size={20} />
+        </div>
+        <div style={styles.bannerTextBox}>
+          <span style={styles.bannerTitle}>¡Felicidades! Superaste tu meta</span>
+          <span style={styles.bannerSub}>Sigue vendiendo para alcanzar el logro diario.</span>
+        </div>
+        <span style={styles.bannerArrow}>
+          <ArrowRight size={18} />
+        </span>
+      </div>
+
+      {/* Gráfico Analítico Simulado */}
+      <h3 style={styles.sectionHeader}>Tendencia de Ventas</h3>
+      <div style={styles.chartWrapper}>
+        <div style={styles.chartYAxis}>
+          <span>1.5K</span><span>1.0K</span><span>500</span><span>0</span>
+        </div>
+        <div style={{ ...styles.chartArea, display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
+          {/* Beautiful SVG Graph of green waves */}
+          <svg style={{ width: '100%', height: '110px', overflow: 'visible' }}>
+            <defs>
+              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#00A859" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#00A859" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path d="M 0 110 L 0 90 Q 30 80 60 75 Q 90 70 120 85 Q 150 100 180 55 Q 210 20 240 30 Q 270 40 300 20 L 300 110 Z" fill="url(#chartGrad)" />
+            <path d="M 0 90 Q 30 80 60 75 Q 90 70 120 85 Q 150 100 180 55 Q 210 20 240 30 Q 270 40 300 20" fill="none" stroke="#00A859" strokeWidth="3" strokeLinecap="round" />
+            <circle cx="0" cy="90" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+            <circle cx="60" cy="75" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+            <circle cx="120" cy="85" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+            <circle cx="180" cy="55" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+            <circle cx="240" cy="30" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+            <circle cx="300" cy="20" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 3. COMPONENTE: CATÁLOGO DE PRODUCTOS
+// ==========================================
+function ProductosScreen({ onAddProduct }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const catalogProducts = [
+    { name: 'Inca Kola 500 ml', price: 4.50, stock: 24, avatar: '🥤', category: 'Bebidas' },
+    { name: 'Coca Cola 500 ml', price: 4.00, stock: 18, avatar: '🥤', category: 'Bebidas' },
+    { name: 'Papas Lays Clásicas', price: 5.00, stock: 5, avatar: '🥔', category: 'Snacks' },
+    { name: 'Chocolate Sublime', price: 3.00, stock: 0, avatar: '🍫', category: 'Golosinas' },
+    { name: 'Galletas Oreo', price: 2.50, stock: 15, avatar: '🍪', category: 'Golosinas' },
+    { name: 'Agua San Luis 500 ml', price: 2.00, stock: 32, avatar: '💧', category: 'Bebidas' }
+  ];
+
+  const filteredProducts = catalogProducts.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div style={styles.scrollContent}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={styles.pageTitle}>Catálogo</h2>
+        <button style={{ ...styles.chartPill, padding: '8px 12px', border: '1px solid #222222', borderRadius: '20px', background: '#111', color: '#FFF', fontSize: '12px', cursor: 'pointer' }} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo</button>
+      </div>
+
+      <div style={styles.searchBarContainer}>
+        <Search size={18} style={{ color: '#8E8E93' }} />
+        <input 
+          type="text" 
+          placeholder="Buscar producto por nombre..." 
+          style={styles.searchInput} 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {filteredProducts.map((p, index) => (
+          <div key={index} style={{ ...styles.cartItem, justifyContent: 'space-between' }}>
+            <div style={styles.cartItemLeft}>
+              <span style={styles.productAvatar}>{p.avatar}</span>
+              <div>
+                <div style={styles.productName}>{p.name}</div>
+                <div style={styles.productPriceText}>S/ {p.price.toFixed(2)} • Stock: {p.stock} u.</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ 
+                fontSize: '10px', 
+                padding: '4px 8px', 
+                borderRadius: '12px', 
+                backgroundColor: p.stock === 0 ? 'rgba(255, 59, 48, 0.1)' : p.stock <= 5 ? 'rgba(255, 149, 0, 0.1)' : 'rgba(34, 177, 91, 0.1)',
+                color: p.stock === 0 ? '#ff3b30' : p.stock <= 5 ? '#ff9500' : '#22B15B'
+              }}>
+                {p.stock === 0 ? 'Agotado' : p.stock <= 5 ? 'Bajo Stock' : 'Disponible'}
+              </span>
+              <button 
+                style={{ 
+                  backgroundColor: p.stock === 0 ? '#222' : '#22B15B', 
+                  color: '#FFFFFF', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  padding: '8px 12px', 
+                  fontSize: '12px', 
+                  fontWeight: '600', 
+                  cursor: p.stock === 0 ? 'not-allowed' : 'pointer' 
+                }} 
+                onClick={() => p.stock > 0 && onAddProduct(p)}
+                disabled={p.stock === 0}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 4. COMPONENTE: HISTORIAL DE VENTAS
+// ==========================================
+function SalesHistoryScreen() {
+  const salesHistory = [
+    { id: 'VEN-9082', time: 'Hace 10 min', total: 24.50, items: 3, method: 'Efectivo', client: 'Franks D.' },
+    { id: 'VEN-9081', time: 'Hace 32 min', total: 15.00, items: 2, method: 'Yape', client: 'General' },
+    { id: 'VEN-9080', time: 'Hace 1 hora', total: 8.50, items: 1, method: 'Plin', client: 'General' },
+    { id: 'VEN-9079', time: 'Hace 2 horas', total: 42.00, items: 5, method: 'Tarjeta', client: 'Maria R.' },
+    { id: 'VEN-9078', time: 'Hace 3 horas', total: 11.50, items: 1, method: 'Efectivo', client: 'General' }
+  ];
+
+  return (
+    <div style={styles.scrollContent}>
+      <h2 style={styles.pageTitle}>Historial de Ventas</h2>
+      
+      <div style={{ 
+        background: 'linear-gradient(135deg, rgba(0, 168, 89, 0.15) 0%, rgba(34, 177, 91, 0.05) 100%)',
+        border: '1px solid rgba(0, 168, 89, 0.25)', 
+        borderRadius: '16px', 
+        padding: '16px 20px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center' 
+      }}>
+        <div>
+          <span style={{ fontSize: '11px', color: '#8E8E93' }}>Total Facturado Hoy</span>
+          <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#22B15B', margin: '2px 0 0 0' }}>S/ 1,240.00</h3>
+        </div>
+        <div style={{ textAlign: 'right', fontSize: '12px', color: '#8E8E93', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span>84 Transacciones</span>
+          <span>Promedio: S/ 14.80</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {salesHistory.map((s) => (
+          <div key={s.id} style={styles.cartItem}>
+            <div style={styles.cartItemLeft}>
+              <span style={{ ...styles.productAvatar, color: '#22B15B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Receipt size={18} /></span>
+              <div>
+                <div style={styles.productName}>Venta {s.id}</div>
+                <div style={styles.productPriceText}>{s.time} • {s.client}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>S/ {s.total.toFixed(2)}</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <span style={{ fontSize: '9px', backgroundColor: '#161616', border: '1px solid #222', padding: '2px 6px', borderRadius: '4px', color: '#8E8E93' }}>{s.items} items</span>
+                <span style={{ 
+                  fontSize: '9px', 
+                  fontWeight: '700',
+                  padding: '2px 6px', 
+                  borderRadius: '4px', 
+                  backgroundColor: s.method === 'Efectivo' ? 'rgba(34, 177, 91, 0.1)' : s.method === 'Yape' ? 'rgba(160, 193, 247, 0.15)' : 'rgba(255, 149, 0, 0.15)',
+                  color: s.method === 'Efectivo' ? '#22B15B' : s.method === 'Yape' ? '#A0C1F7' : '#ff9500'
+                }}>{s.method}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 5. COMPONENTE: NUEVA VENTA (Vista Escáner)
+// ==========================================
+function NuevaVentaScreen({ cart, onAddQty, onSubQty, onDeleteItem, onScanClick, flashActive, onSearchAdd }) {
+  const [manualSearch, setManualSearch] = useState('');
+  
+  // Cart calculations
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const discount = subtotal > 15 ? 1.50 : 0.00; // S/ 1.50 discount if subtotal exceeds S/ 15
+  const total = subtotal - discount;
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && manualSearch.trim()) {
+      onSearchAdd(manualSearch);
+      setManualSearch('');
+    }
   };
 
-  const handleReset = () => {
-    setEmail('');
-    setPassword('');
-    setError('');
-    setLoginSuccess(false);
-    setLoggedInUser('');
-    setSidebarOpen(false);
-  };
+  return (
+    <div style={styles.scrollContent}>
+      <h2 style={styles.pageTitle}>Nueva venta</h2>
+      
+      {/* Caja de Escáner Principal */}
+      <div 
+        style={{ 
+          ...styles.mainScannerCard, 
+          position: 'relative', 
+          cursor: 'pointer',
+          overflow: 'hidden'
+        }} 
+        onClick={onScanClick}
+      >
+        {/* Flash Effect overlay */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#ffffff',
+          zIndex: 5,
+          opacity: flashActive ? 0.8 : 0,
+          pointerEvents: 'none',
+          transition: 'opacity 0.2s ease'
+        }}></div>
 
-  // Handlers for Cart / POS
-  const updateQty = (id, delta) => {
-    setCart(prevCart => 
-      prevCart.map(item => {
-        if (item.id === id) {
-          const newQty = item.qty + delta;
-          return { ...item, qty: newQty < 1 ? 1 : newQty };
-        }
-        return item;
-      })
-    );
-  };
+        <span style={styles.scannerHeaderTitle}>Escanear producto</span>
+        <span style={styles.scannerHeaderSub}>Haz clic aquí para simular el escaneo de código de barras o QR</span>
+        <div style={styles.scannerFrameTarget}>
+          <div className="scanner-laser"></div>
+          <Camera size={32} style={{ color: '#FFFFFF' }} />
+        </div>
+      </div>
 
-  const deleteItem = (id) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== id));
-  };
+      <div style={styles.searchBarContainer}>
+         <Search size={18} style={{ color: '#8E8E93' }} />
+         <input 
+           type="text" 
+           placeholder="Buscar producto manualmente (Presiona Enter)..." 
+           style={styles.searchInput} 
+           value={manualSearch}
+           onChange={(e) => setManualSearch(e.target.value)}
+           onKeyDown={handleKeyDown}
+         />
+      </div>
 
-  // Simulated scan beep & product generation
+      {/* Lista del Carrito */}
+      <h3 style={styles.sectionHeader}>Productos en la venta ({cart.reduce((sum, item) => sum + item.qty, 0)})</h3>
+      <div style={styles.cartList}>
+        {cart.length > 0 ? (
+          cart.map((item) => (
+            <div key={item.id} style={styles.cartItem}>
+              <div style={styles.cartItemLeft}>
+                <span style={styles.productAvatar}>{item.avatar || '🥤'}</span>
+                <div>
+                  <div style={styles.productName}>{item.name}</div>
+                  <div style={styles.productPriceText}>S/ {item.price.toFixed(2)}</div>
+                </div>
+              </div>
+              <div style={styles.cartItemRight}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={styles.qtyCounter}>
+                    <span style={{ cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }} onClick={() => onSubQty(item.id)}><Minus size={12} /></span> 
+                    <span style={{ minWidth: '16px', textAlign: 'center' }}>{item.qty}</span> 
+                    <span style={{ cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }} onClick={() => onAddQty(item.id)}><Plus size={12} /></span>
+                  </div>
+                  <button 
+                    style={{ background: 'none', border: 'none', color: '#ff3b30', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    onClick={() => onDeleteItem(item.id)}
+                    aria-label="Eliminar producto"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <span style={styles.itemTotalRow}>S/ {(item.price * item.qty).toFixed(2)}</span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#8E8E93', fontSize: '13px' }}>
+            El carrito está vacío. Escanea o agrega productos.
+          </div>
+        )}
+      </div>
+
+      {/* Resumen de Caja */}
+      <div style={styles.checkoutSummaryCard}>
+        <div style={styles.summaryRow}><span>Subtotal</span><span>S/ {subtotal.toFixed(2)}</span></div>
+        <div style={styles.summaryRow}><span>Descuento</span><span style={styles.greenText}>- S/ {discount.toFixed(2)}</span></div>
+        <div style={styles.totalRowBlock}><span>TOTAL</span><span style={styles.totalPriceValue}>S/ {total.toFixed(2)}</span></div>
+      </div>
+
+      <button style={styles.btnPrimaryAction} onClick={() => alert('Venta completada con éxito por un total de S/ ' + total.toFixed(2))}>
+        Continuar venta 
+      </button>
+    </div>
+  );
+}
+
+// ==========================================
+// 6. COMPONENTE CONTROLADOR (Raíz de la App)
+// ==========================================
+export default function VendixApp() {
+  const [currentRoute, setCurrentRoute] = useState('login'); // 'login', 'dashboard', 'scanner', 'products', 'sales'
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loggedInUser, setLoggedInUser] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [flashActive, setFlashActive] = useState(false);
+
+  // Cart state initialized to matches mockup items
+  const [cart, setCart] = useState([
+    { id: 1, name: 'Coca Cola 500 ml', price: 4.00, qty: 2, avatar: '🥤' },
+    { id: 2, name: 'Inca Kola 500 ml', price: 4.50, qty: 1, avatar: '🥤' }
+  ]);
+
+  // Handle simulated scan beep and random product addition
   const handleScan = () => {
-    // 1. Play synth beep using Web Audio API
+    // 1. Play beep
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
@@ -155,20 +510,20 @@ function App() {
       gainNode.connect(audioCtx.destination);
 
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); // High pitch beep
-      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime); // volume
+      oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); 
+      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime); 
 
       oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.12); // Beep duration 120ms
+      oscillator.stop(audioCtx.currentTime + 0.12); 
     } catch (e) {
-      console.log('Audio API not allowed or supported yet:', e);
+      console.log('Audio API beep supported/allowed:', e);
     }
 
-    // 2. Trigger scanner laser flash effect
+    // 2. Trigger scanner laser flash
     setFlashActive(true);
-    setTimeout(() => setFlashActive(false), 300);
+    setTimeout(() => setFlashActive(false), 250);
 
-    // 3. Add random product to cart
+    // 3. Add random product
     const randProd = SCAN_PRODUCTS[Math.floor(Math.random() * SCAN_PRODUCTS.length)];
     setCart(prevCart => {
       const existing = prevCart.find(item => item.name === randProd.name);
@@ -188,52 +543,166 @@ function App() {
     });
   };
 
-  // Cart Calculations
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const discount = subtotal > 10 ? 1.50 : 0.00; // S/ 1.50 discount if subtotal exceeds S/ 10
-  const total = subtotal - discount;
+  // Add from catalog
+  const handleAddProductFromCatalog = (product) => {
+    // Play sound beep
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch (e) {}
+
+    setCart(prevCart => {
+      const existing = prevCart.find(item => item.name === product.name);
+      if (existing) {
+        return prevCart.map(item => 
+          item.name === product.name ? { ...item, qty: item.qty + 1 } : item
+        );
+      } else {
+        return [...prevCart, {
+          id: Date.now(),
+          name: product.name,
+          price: product.price,
+          qty: 1,
+          avatar: product.avatar
+        }];
+      }
+    });
+  };
+
+  // Search addition
+  const handleSearchAdd = (name) => {
+    const found = SCAN_PRODUCTS.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
+    const productToAdd = found || { name: name, price: 4.50, avatar: '📦' };
+    handleAddProductFromCatalog(productToAdd);
+  };
+
+  // Cart Qty Modifiers
+  const handleAddQty = (id) => {
+    setCart(prevCart => prevCart.map(item => item.id === id ? { ...item, qty: item.qty + 1 } : item));
+  };
+
+  const handleSubQty = (id) => {
+    setCart(prevCart => prevCart.map(item => {
+      if (item.id === id) {
+        const newQty = item.qty - 1;
+        return { ...item, qty: newQty < 1 ? 1 : newQty };
+      }
+      return item;
+    }));
+  };
+
+  const handleDeleteItem = (id) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== id));
+  };
 
   return (
-    <>
-      {/* Background glow orbs */}
-      <div className="bg-glow-container">
-        <div className="bg-glow-orb-1"></div>
-        <div className="bg-glow-orb-2"></div>
-      </div>
+    <div style={styles.deviceViewport}>
+      {/* HEADER PRINCIPAL (Oculto en Login o en Venta Completa Escáner) */}
+      {currentRoute !== 'login' && currentRoute !== 'scanner' && (
+        <header style={styles.navbarTop}>
+          {/* 3 RAYITAS ARRIBA A LA IZQUIERDA */}
+          <button style={styles.hamburgerBtn} onClick={() => setSidebarOpen(true)}>
+             <Menu size={24} />
+          </button>
+          <span style={styles.topBarLogoName}>Vendix</span>
+          <button style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => alert('No tienes notificaciones pendientes.')}>
+             <Bell size={20} />
+          </button>
+        </header>
+      )}
 
-      {/* 1. SIDEBAR DRAWER & OVERLAY */}
-      {loginSuccess && (
+      {/* SIDEBAR DRAWER PANEL */}
+      {currentRoute !== 'login' && (
         <>
-          <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)}></div>
-          <div className={`sidebar-drawer ${sidebarOpen ? 'open' : ''}`}>
-            <div className="sidebar-header">
-              <div className="sidebar-profile">
-                <div className="profile-icon">🏪</div>
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              zIndex: 1000,
+              opacity: sidebarOpen ? 1 : 0,
+              pointerEvents: sidebarOpen ? 'auto' : 'none',
+              transition: 'opacity 0.3s ease'
+            }}
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '280px',
+              height: '100vh',
+              backgroundColor: '#111111',
+              borderRight: '1px solid #222222',
+              zIndex: 1010,
+              display: 'flex',
+              flexDirection: 'column',
+              transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '10px 0 30px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #222' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '20px', backgroundColor: 'rgba(0, 168, 89, 0.1)', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>🏪</span>
                 <div>
-                  <h4>Vendix Pucallpa</h4>
-                  <p>Sucursal Principal</p>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>Vendix Pucallpa</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#8E8E93' }}>Sucursal Principal</p>
                 </div>
               </div>
-              <button className="btn-close-sidebar" onClick={() => setSidebarOpen(false)} aria-label="Cerrar menú">
+              <button 
+                onClick={() => setSidebarOpen(false)} 
+                style={{ background: 'none', border: 'none', color: '#8E8E93', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
                 <X size={20} />
               </button>
             </div>
-            <div className="sidebar-content">
-              <div className="sidebar-menu-group">
-                <span>Mi Negocio</span>
-                <a href="#sucursales" className="sidebar-link active" onClick={(e) => { e.preventDefault(); setSidebarOpen(false); }}>
+            
+            <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#00A859', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '8px' }}>Mi Negocio</span>
+                <button 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(0, 168, 89, 0.08)', border: '1px solid rgba(0, 168, 89, 0.2)', color: '#00A859', fontSize: '13.5px', fontWeight: '600', width: '100%', cursor: 'pointer', textAlign: 'left' }}
+                  onClick={() => { setSidebarOpen(false); alert('Sucursal Principal seleccionada.'); }}
+                >
                   <span>Sucursal Pucallpa</span>
                   <ChevronRight size={14} />
-                </a>
-                <a href="#settings" className="sidebar-link" onClick={(e) => { e.preventDefault(); setSidebarOpen(false); alert('Configuraciones abiertas.'); }}>
+                </button>
+                <button 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: 'transparent', border: '1px solid transparent', color: '#FFFFFF', fontSize: '13.5px', width: '100%', cursor: 'pointer', textAlign: 'left' }}
+                  onClick={() => { setSidebarOpen(false); alert('Configuraciones de negocio abiertas.'); }}
+                >
                   <span>Configuraciones</span>
                   <ChevronRight size={14} />
-                </a>
+                </button>
               </div>
-              <div className="sidebar-menu-group">
-                <span>Sesión</span>
-                <span className="sidebar-user-info">{loggedInUser}</span>
-                <button className="btn-secondary sidebar-logout-btn" onClick={handleReset}>
+
+              <div>
+                <span style={{ fontSize: '12px', color: '#8E8E93', display: 'block', marginBottom: '8px', borderTop: '1px dashed #222', paddingTop: '12px', wordBreak: 'break-all' }}>{loggedInUser || 'duque@gmail.com'}</span>
+                <button 
+                  onClick={() => {
+                    setLoggedInUser('');
+                    setEmail('');
+                    setPassword('');
+                    setCurrentRoute('login');
+                    setSidebarOpen(false);
+                  }}
+                  style={{ width: '100%', backgroundColor: 'transparent', border: '1px solid #ff3b30', color: '#ff3b30', borderRadius: '12px', padding: '10px', fontSize: '13.5px', fontWeight: '600', cursor: 'pointer' }}
+                >
                   Cerrar Sesión
                 </button>
               </div>
@@ -242,605 +711,173 @@ function App() {
         </>
       )}
 
-      {/* 2. APP HEADER (Sticky Top) */}
-      {loginSuccess && pantallaActual !== 'escanear' && (
-        <header className="app-header">
-          <button className="menu-hamburger-btn" onClick={() => setSidebarOpen(true)} aria-label="Abrir menú">
-            <Menu size={24} />
+      {/* ESPACIO DE RENDERIZADO DE PANTALLAS */}
+      <main style={styles.appViewContainer}>
+        {currentRoute === 'login' && (
+          <LoginScreen 
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            onLoginSuccess={() => {
+              setLoggedInUser(email || 'duque@gmail.com');
+              setCurrentRoute('dashboard');
+            }} 
+          />
+        )}
+        {currentRoute === 'dashboard' && <DashboardScreen onMetaClick={() => setCurrentRoute('scanner')} />}
+        {currentRoute === 'products' && <ProductsScreen onAddProduct={handleAddProductFromCatalog} />}
+        {currentRoute === 'sales' && <SalesHistoryScreen />}
+        {currentRoute === 'scanner' && (
+          <NuevaVentaScreen 
+            cart={cart}
+            onAddQty={handleAddQty}
+            onSubQty={handleSubQty}
+            onDeleteItem={handleDeleteItem}
+            onScanClick={handleScan}
+            flashActive={flashActive}
+            onSearchAdd={handleSearchAdd}
+          />
+        )}
+      </main>
+
+      {/* BARRA DE NAVEGACIÓN INFERIOR (Oculta en Login) */}
+      {currentRoute !== 'login' && (
+        <nav style={styles.bottomTabNavigation}>
+          <button 
+            style={currentRoute === 'dashboard' ? styles.tabItemActive : styles.tabItem} 
+            onClick={() => setCurrentRoute('dashboard')}
+          >
+            <HomeIcon size={20} />
+            <span>Inicio</span>
           </button>
-          <div className="brand-logo">
-            <img src={logoImg} alt="Vendix Logo" />
-            <span>Vendix</span>
-          </div>
-          <button className="notification-btn" onClick={() => alert('No tienes notificaciones pendientes.')} aria-label="Ver notificaciones">
-            <Bell size={22} />
+          
+          <button 
+            style={currentRoute === 'products' ? styles.tabItemActive : styles.tabItem} 
+            onClick={() => setCurrentRoute('products')}
+          >
+            <Package size={20} />
+            <span>Productos</span>
           </button>
-        </header>
+          
+          {/* BOTÓN CENTRAL FLOTANTE NUEVA VENTA */}
+          <button style={styles.centerFloatingBtn} onClick={() => setCurrentRoute('scanner')}>
+            <Plus size={26} />
+          </button>
+          
+          <button 
+            style={currentRoute === 'sales' ? styles.tabItemActive : styles.tabItem} 
+            onClick={() => setCurrentRoute('sales')}
+          >
+            <Receipt size={20} />
+            <span>Ventas</span>
+          </button>
+          
+          {/* BOTÓN DE ESCANEAR EN LA ESQUINA INFERIOR DERECHA */}
+          <button 
+            style={currentRoute === 'scanner' ? styles.tabItemActiveGreen : styles.tabItem} 
+            onClick={() => {
+              if (currentRoute !== 'scanner') {
+                setCurrentRoute('scanner');
+              } else {
+                handleScan();
+              }
+            }}
+          >
+            <Scan size={20} />
+            <span>Escanear</span>
+          </button>
+        </nav>
       )}
-
-      {!loginSuccess ? (
-        <div className="container">
-          {/* Brand Section (Left) */}
-          <section className="brand-section">
-              <div className="logo-wrapper">
-                  <img src={logoImg} alt="Vendix Logo" className="logo-img" />
-                  <h1 className="brand-name">Vendix</h1>
-              </div>
-              <p className="slogan">Controla. Vende. Crece.</p>
-              <p className="brand-desc">
-                  El sistema inteligente de gestión de ventas y control de inventarios diseñado para potenciar tu negocio. Simplifica tus operaciones diarias, escanea con códigos QR y mantén el control total desde cualquier dispositivo.
-              </p>
-
-              <div className="feature-list">
-                  <div className="feature-item">
-                      <div className="feature-icon-wrapper">
-                          <TrendingUp size={20} />
-                      </div>
-                      <div className="feature-text">
-                          <h3>Control de Ventas Rápido</h3>
-                          <p>Factura en segundos y realiza un seguimiento automático de tus ingresos diarios.</p>
-                      </div>
-                  </div>
-
-                  <div className="feature-item">
-                      <div className="feature-icon-wrapper">
-                          <Calendar size={20} />
-                      </div>
-                      <div className="feature-text">
-                          <h3>Gestión de Inventario</h3>
-                          <p>Controla existencias, entradas y salidas en tiempo real con soporte para códigos QR.</p>
-                      </div>
-                  </div>
-
-                  <div className="feature-item">
-                      <div className="feature-icon-wrapper">
-                          <AlertCircle size={20} />
-                      </div>
-                      <div className="feature-text">
-                          <h3>Alertas Inteligentes</h3>
-                          <p>Recibe notificaciones automáticas cuando tus productos alcancen el stock mínimo.</p>
-                      </div>
-                  </div>
-              </div>
-          </section>
-
-          {/* Login Card (Right) */}
-          <main className="login-card">
-            <div id="cardContent">
-              <header className="card-header">
-                <h2>Bienvenido</h2>
-                <p>Ingresa tus credenciales para acceder a Vendix.</p>
-              </header>
-
-              {error && (
-                <div className="error-alert">
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit}>
-                {/* Email / Username Input */}
-                <div className="form-group">
-                  <div className="input-container">
-                    <span className="input-icon">
-                      <User size={18} />
-                    </span>
-                    <div className="input-field-wrapper">
-                      <span className="input-label">USUARIO / CORREO</span>
-                      <input 
-                        type="text" 
-                        className="input-field" 
-                        placeholder="ejemplo@vendix.com" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading || isLoadingGuest}
-                        autoComplete="username"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Password Input */}
-                <div className="form-group">
-                  <div className="input-container">
-                    <span className="input-icon">
-                      <Lock size={18} />
-                    </span>
-                    <div className="input-field-wrapper">
-                      <span className="input-label">CONTRASEÑA</span>
-                      <input 
-                        type={showPassword ? "text" : "password"} 
-                        className="input-field" 
-                        placeholder="••••••••" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading || isLoadingGuest}
-                        autoComplete="current-password"
-                      />
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn-toggle-password" 
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label="Mostrar u ocultar contraseña"
-                      disabled={isLoading || isLoadingGuest}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Options */}
-                <div className="form-options">
-                  <label className="remember-me">
-                    <input 
-                      type="checkbox" 
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      disabled={isLoading || isLoadingGuest}
-                    />
-                    <span>Recordarme</span>
-                  </label>
-                  <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="action-buttons">
-                  <button 
-                    type="submit" 
-                    className={`btn-primary ${isLoading ? 'loading' : ''}`}
-                    disabled={isLoading || isLoadingGuest}
-                  >
-                    {!isLoading ? (
-                      <>
-                        <span className="btn-text">Iniciar Sesión</span>
-                        <ArrowRight size={16} />
-                      </>
-                    ) : (
-                      <span className="spinner"></span>
-                    )}
-                  </button>
-
-                  <div className="divider">o continúa con</div>
-
-                  <button 
-                    type="button" 
-                    className="btn-secondary"
-                    onClick={handleGuestLogin}
-                    disabled={isLoading || isLoadingGuest}
-                  >
-                    {isLoadingGuest ? (
-                      <span className="spinner" style={{ borderTopColor: 'var(--color-text-main)' }}></span>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="motion-user-icon">
-                          <line x1="2" y1="8" x2="6" y2="8" />
-                          <line x1="2" y1="12" x2="8" y2="12" />
-                          <line x1="2" y1="16" x2="5" y2="16" />
-                          <path d="M19 21v-2a4 4 0 0 0-4-4h-2a4 4 0 0 0-4 4v2" />
-                          <circle cx="14" cy="7" r="4" />
-                        </svg>
-                        <span>Modo Invitado</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-
-              <footer className="card-footer">
-                ¿No tienes cuenta? <a href="#">Registra tu negocio aquí</a>
-              </footer>
-            </div>
-          </main>
-        </div>
-      ) : (
-        <div className="app-container">
-          <main className="main-content">
-            {pantallaActual === 'inicio' && (
-              <div className="dashboard-view">
-                <div className="section-title-bar">
-                  <h2>Dashboard Principal</h2>
-                </div>
-
-                {/* KPIs metric grid */}
-                <div className="metric-grid">
-                  <div className="metric-card">
-                    <span>Ventas de Hoy</span>
-                    <div className="metric-val">S/ 1,240.00</div>
-                    <div className="metric-change">
-                      <span>+12.5%</span>
-                      <TrendingUp size={12} style={{ color: '#22B15B' }} />
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <span>Transacciones</span>
-                    <div className="metric-val">84</div>
-                    <div className="metric-change">
-                      <span>+8.3%</span>
-                      <TrendingUp size={12} style={{ color: '#22B15B' }} />
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <span>Ticket Promedio</span>
-                    <div className="metric-val">S/ 14.80</div>
-                    <div className="metric-change" style={{ color: '#8E8E93' }}>
-                      <span>Estable</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Motivation gamification banner */}
-                <div className="gamification-banner" onClick={handleScan}>
-                  <div className="banner-left">
-                    <div className="banner-icon-box">
-                      <ShoppingBag size={20} />
-                    </div>
-                    <div className="banner-text">
-                      <h3>¡Felicidades! Superaste tu meta</h3>
-                      <p>Sigue vendiendo para alcanzar el logro diario.</p>
-                    </div>
-                  </div>
-                  <div className="banner-arrow">
-                    <ArrowRight size={20} />
-                  </div>
-                </div>
-
-                {/* Sales Chart Card */}
-                <div className="sales-chart-card">
-                  <div className="chart-header">
-                    <h3>Tendencia de Ventas</h3>
-                    <button className="chart-pill">Esta semana</button>
-                  </div>
-                  <div className="chart-area">
-                    <div className="chart-y-axis">
-                      <span>1.5K</span>
-                      <span>1.0K</span>
-                      <span>500</span>
-                      <span>0</span>
-                    </div>
-                    <div className="chart-svg-container">
-                      <div className="chart-grid-line" style={{ top: '0%' }}></div>
-                      <div className="chart-grid-line" style={{ top: '33.3%' }}></div>
-                      <div className="chart-grid-line" style={{ top: '66.6%' }}></div>
-                      <div className="chart-grid-line" style={{ top: '100%', borderTopStyle: 'solid' }}></div>
-                      
-                      <svg className="chart-svg">
-                        <defs>
-                          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#00A859" stopOpacity="0.3" />
-                            <stop offset="100%" stopColor="#00A859" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Area shading under trendline */}
-                        <path d="M 0 100 L 0 80 Q 40 70 80 65 Q 120 60 160 75 Q 200 90 240 45 Q 280 10 320 20 Q 360 30 400 10 L 400 100 Z" className="chart-area-fill" />
-                        {/* Trendline */}
-                        <path d="M 0 80 Q 40 70 80 65 Q 120 60 160 75 Q 200 90 240 45 Q 280 10 320 20 Q 360 30 400 10" className="chart-line" />
-                        {/* Interactive Nodes */}
-                        <circle cx="0" cy="80" r="4.5" className="chart-node" />
-                        <circle cx="80" cy="65" r="4.5" className="chart-node" />
-                        <circle cx="160" cy="75" r="4.5" className="chart-node" />
-                        <circle cx="240" cy="45" r="4.5" className="chart-node" />
-                        <circle cx="320" cy="20" r="4.5" className="chart-node" />
-                        <circle cx="400" cy="10" r="4.5" className="chart-node" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="chart-x-axis">
-                    <span>Lun</span>
-                    <span>Mar</span>
-                    <span>Mié</span>
-                    <span>Jue</span>
-                    <span>Vie</span>
-                    <span>Sáb</span>
-                    <span>Dom</span>
-                  </div>
-                </div>
-
-                {/* Quick info alerts section */}
-                <div className="quick-info-grid">
-                  <div className="alert-card warning">
-                    <div className="alert-icon-box">
-                      <AlertCircle size={16} />
-                    </div>
-                    <h4>Stock Bajo</h4>
-                    <span className="alert-num">5</span>
-                  </div>
-
-                  <div className="alert-card danger">
-                    <div className="alert-icon-box">
-                      <AlertCircle size={16} />
-                    </div>
-                    <h4>Agotados</h4>
-                    <span className="alert-num">2</span>
-                  </div>
-
-                  <div className="alert-card info">
-                    <div className="alert-icon-box">
-                      <User size={16} />
-                    </div>
-                    <h4>Cajas</h4>
-                    <span className="alert-num">2</span>
-                  </div>
-
-                  <div className="alert-card success">
-                    <div className="alert-icon-box">
-                      <Check size={16} />
-                    </div>
-                    <h4>Clientes</h4>
-                    <span className="alert-num">48</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {pantallaActual === 'productos' && (
-              <div className="products-view">
-                <div className="section-title-bar">
-                  <h2>Catálogo de Productos</h2>
-                  <button className="chart-pill" onClick={() => alert('Función para agregar producto disponible próximamente.')}>+ Nuevo Producto</button>
-                </div>
-
-                {/* Search Bar */}
-                <div className="search-bar-container">
-                  <span className="search-icon"><Search size={18} /></span>
-                  <input type="text" placeholder="Buscar producto por nombre, categoría o código..." className="search-input" readOnly />
-                </div>
-
-                {/* Products Grid */}
-                <div className="products-grid-list">
-                  {[
-                    { name: 'Inca Kola 500ml', price: 3.50, stock: 24, avatar: '🥤', category: 'Bebidas', status: 'In stock' },
-                    { name: 'Coca Cola 500ml', price: 3.50, stock: 18, avatar: '🥤', category: 'Bebidas', status: 'In stock' },
-                    { name: 'Papas Lays Clásicas', price: 4.50, stock: 5, avatar: '🥔', category: 'Snacks', status: 'Low stock' },
-                    { name: 'Chocolate Sublime', price: 3.00, stock: 0, avatar: '🍫', category: 'Golosinas', status: 'Out of stock' },
-                    { name: 'Galletas Oreo', price: 2.50, stock: 15, avatar: '🍪', category: 'Golosinas', status: 'In stock' },
-                    { name: 'Agua San Luis 500ml', price: 2.00, stock: 32, avatar: '💧', category: 'Bebidas', status: 'In stock' }
-                  ].map((p, index) => (
-                    <div key={index} className="product-catalog-card">
-                      <div className="prod-cat-header">
-                        <span className="prod-cat-avatar">{p.avatar}</span>
-                        <span className={`prod-cat-badge ${p.status.toLowerCase().replace(' ', '-')}`}>
-                          {p.status === 'In stock' ? 'Disponible' : p.status === 'Low stock' ? 'Bajo Stock' : 'Agotado'}
-                        </span>
-                      </div>
-                      <div className="prod-cat-body">
-                        <h3>{p.name}</h3>
-                        <p className="prod-cat-category">{p.category}</p>
-                        <div className="prod-cat-info">
-                          <span className="prod-cat-price">S/ {p.price.toFixed(2)}</span>
-                          <span className="prod-cat-stock">Stock: {p.stock} u.</span>
-                        </div>
-                      </div>
-                      <div className="prod-cat-footer">
-                        <button className="btn-primary btn-small" onClick={() => {
-                          setCart(prevCart => {
-                            const existing = prevCart.find(item => item.name === p.name);
-                            if (existing) {
-                              return prevCart.map(item => 
-                                item.name === p.name ? { ...item, qty: item.qty + 1 } : item
-                              );
-                            } else {
-                              return [...prevCart, {
-                                id: Date.now() + index,
-                                name: p.name,
-                                price: p.price,
-                                qty: 1,
-                                avatar: p.avatar
-                              }];
-                            }
-                          });
-                          // Play simulated beep
-                          try {
-                            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                            const oscillator = audioCtx.createOscillator();
-                            const gainNode = audioCtx.createGain();
-                            oscillator.connect(gainNode);
-                            gainNode.connect(audioCtx.destination);
-                            oscillator.type = 'sine';
-                            oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
-                            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                            oscillator.start();
-                            oscillator.stop(audioCtx.currentTime + 0.1);
-                          } catch (e) {}
-                        }}>+ Agregar</button>
-                        <button className="btn-edit-product" onClick={() => alert(`Editando ${p.name}`)}>
-                          Editar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {pantallaActual === 'ventas' && (
-              <div className="sales-history-view">
-                <div className="section-title-bar">
-                  <h2>Historial de Ventas</h2>
-                  <button className="chart-pill">Hoy</button>
-                </div>
-
-                {/* Sales Summary Banner */}
-                <div className="sales-summary-banner">
-                  <div className="sales-summary-info">
-                    <span>Total Facturado Hoy</span>
-                    <h3>S/ 1,240.00</h3>
-                  </div>
-                  <div className="sales-summary-meta">
-                    <span>84 Transacciones</span>
-                    <span>Ticket Promedio: S/ 14.80</span>
-                  </div>
-                </div>
-
-                {/* Recent Sales List */}
-                <div className="sales-history-list">
-                  {[
-                    { id: 'VEN-9082', time: 'Hace 10 min', total: 24.50, items: 3, method: 'Efectivo', client: 'Franks D.' },
-                    { id: 'VEN-9081', time: 'Hace 32 min', total: 15.00, items: 2, method: 'Yape', client: 'General' },
-                    { id: 'VEN-9080', time: 'Hace 1 hora', total: 8.50, items: 1, method: 'Plin', client: 'General' },
-                    { id: 'VEN-9079', time: 'Hace 2 horas', total: 42.00, items: 5, method: 'Tarjeta', client: 'Maria R.' },
-                    { id: 'VEN-9078', time: 'Hace 3 horas', total: 11.50, items: 1, method: 'Efectivo', client: 'General' },
-                    { id: 'VEN-9077', time: 'Hace 4 horas', total: 35.00, items: 4, method: 'Yape', client: 'Jose M.' },
-                    { id: 'VEN-9076', time: 'Hace 5 horas', total: 18.00, items: 2, method: 'Efectivo', client: 'General' }
-                  ].map((sale) => (
-                    <div key={sale.id} className="sale-history-item">
-                      <div className="sale-history-left">
-                        <div className="sale-history-icon">
-                          <Receipt size={18} />
-                        </div>
-                        <div className="sale-history-details">
-                          <h4>Venta {sale.id}</h4>
-                          <p>{sale.time} • Cliente: {sale.client}</p>
-                        </div>
-                      </div>
-                      <div className="sale-history-right">
-                        <span className="sale-history-amount">S/ {sale.total.toFixed(2)}</span>
-                        <div className="sale-history-tags">
-                          <span className="sale-tag-items">{sale.items} items</span>
-                          <span className={`sale-tag-method ${sale.method.toLowerCase()}`}>{sale.method}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {pantallaActual === 'escanear' && (
-              <div className="pos-view">
-                <div className="section-title-bar">
-                  <h2>Módulo de Nueva Venta</h2>
-                </div>
-
-                {/* Product Scanner (Top Box) */}
-                <div className="scanner-box" onClick={handleScan}>
-                  <div className="scanner-laser"></div>
-                  <div className={`flash-effect ${flashActive ? 'active' : ''}`}></div>
-                  <div className="scanner-icon-box">
-                    <Camera size={24} />
-                  </div>
-                  <div className="scanner-text">
-                    <h3>Escanear Código de Barras / QR</h3>
-                    <p>Haz clic para simular el escaneo de un producto con la cámara.</p>
-                  </div>
-                </div>
-
-                {/* Cart Added Products List */}
-                <div className="cart-list">
-                  {cart.length > 0 ? (
-                    cart.map(item => (
-                      <div key={item.id} className="product-item">
-                        <div className="prod-info-block">
-                          <div className="prod-avatar">{item.avatar}</div>
-                          <div className="prod-details">
-                            <h4>{item.name}</h4>
-                            <p>Precio Unitario: S/ {item.price.toFixed(2)}</p>
-                          </div>
-                        </div>
-                        <div className="prod-action-block">
-                          <div className="quantity-selector">
-                            <button className="qty-btn" onClick={() => updateQty(item.id, -1)}>-</button>
-                            <span className="qty-num">{item.qty}</span>
-                            <button className="qty-btn" onClick={() => updateQty(item.id, 1)}>+</button>
-                          </div>
-                          <div className="prod-price-block">
-                            <span className="prod-price">S/ {(item.price * item.qty).toFixed(2)}</span>
-                          </div>
-                          <button className="btn-delete" onClick={() => deleteItem(item.id)} aria-label="Eliminar producto">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text-sec)', fontSize: '13px' }}>
-                      El carrito está vacío. Escanea productos para comenzar.
-                    </div>
-                  )}
-                </div>
-
-                {/* Billing Summary Box */}
-                <div className="totals-box">
-                  <div className="total-row">
-                    <span>Subtotal</span>
-                    <span>S/ {subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="total-row discount">
-                    <span>Descuento</span>
-                    <span>- S/ {discount.toFixed(2)}</span>
-                  </div>
-                  <div className="total-row grand-total">
-                    <span>TOTAL</span>
-                    <span>S/ {total.toFixed(2)}</span>
-                  </div>
-
-                  <button className="btn-primary" style={{ marginTop: '8px' }} onClick={() => alert('Venta continuada con éxito por un total de S/ ' + total.toFixed(2))}>
-                    <span>Continuar venta</span>
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </main>
-
-          {/* 5. COMMON BOTTOM NAVIGATION BAR */}
-          <nav className="bottom-nav">
-            <button 
-              className={`nav-item ${pantallaActual === 'inicio' ? 'active' : ''}`}
-              onClick={() => setPantallaActual('inicio')}
-            >
-              <HomeIcon size={20} />
-              <span>Inicio</span>
-            </button>
-
-            <button 
-              className={`nav-item ${pantallaActual === 'productos' ? 'active' : ''}`}
-              onClick={() => setPantallaActual('productos')}
-            >
-              <Package size={20} />
-              <span>Productos</span>
-            </button>
-
-            {/* Botón Central de Nueva Venta */}
-            <button 
-              className="btn-floating-action"
-              onClick={() => setPantallaActual('escanear')}
-              aria-label="Nueva Venta"
-            >
-              <Plus size={28} />
-            </button>
-
-            <button 
-              className={`nav-item ${pantallaActual === 'ventas' ? 'active' : ''}`}
-              onClick={() => setPantallaActual('ventas')}
-            >
-              <Receipt size={20} />
-              <span>Ventas</span>
-            </button>
-
-            {/* Botón de Escáner Directo */}
-            <button 
-              className={`nav-item ${pantallaActual === 'escanear' ? 'active-green' : ''}`}
-              onClick={() => {
-                if (pantallaActual !== 'escanear') {
-                  setPantallaActual('escanear');
-                } else {
-                  handleScan();
-                }
-              }}
-              aria-label="Escanear producto rápido"
-            >
-              <Scan size={22} />
-              <span>Escanear</span>
-            </button>
-          </nav>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
-export default App;
+// ==========================================
+// 7. OBJETO DE ESTILOS CSS EN LÍNEA (JS)
+// ==========================================
+const styles = {
+  deviceViewport: { backgroundColor: '#080808', color: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflowX: 'hidden' },
+  navbarTop: { height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', backgroundColor: '#080808', borderBottom: '1px solid #141414', position: 'sticky', top: 0, zIndex: 10 },
+  hamburgerBtn: { background: 'none', border: 'none', color: '#FFFFFF', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
+  topBarLogoName: { fontSize: '20px', fontWeight: 'bold', letterSpacing: '0.5px' },
+  topNotificationIcon: { fontSize: '20px', cursor: 'pointer' },
+  appViewContainer: { flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: '90px' },
+  scrollContent: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1200px', margin: '0 auto', width: '100%' },
+  
+  // Login Styles
+  loginContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', minHeight: '85vh' },
+  brandHeader: { textAlign: 'center', marginBottom: '32px' },
+  logoWrapper: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' },
+  logoIcon: { fontSize: '36px' },
+  logoText: { fontSize: '32px', margin: 0, fontWeight: '800' },
+  slogan: { color: '#00A859', margin: '6px 0 0 0', fontWeight: '500', letterSpacing: '1px', fontSize: '14px' },
+  loginCard: { backgroundColor: '#111111', border: '1px solid #222222', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '380px', boxSizing: 'border-box' },
+  cardTitle: { margin: '0 0 6px 0', fontSize: '24px', fontWeight: '700', textAlign: 'center' },
+  cardSubtitle: { color: '#8E8E93', margin: '0 0 24px 0', fontSize: '13px', textAlign: 'center' },
+  inputGroup: { marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' },
+  inputLabel: { color: '#00A859', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' },
+  inputField: { width: '100%', backgroundColor: '#161616', border: '1px solid #222222', borderRadius: '12px', padding: '14px', color: '#FFFFFF', fontSize: '14px', boxSizing: 'border-box', outline: 'none' },
+  rowUtilities: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', margin: '12px 0 20px 0' },
+  checkboxLabel: { color: '#8E8E93', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' },
+  linkText: { color: '#00A859', cursor: 'pointer' },
+  linkTextHighlight: { color: '#22B15B', fontWeight: '600', cursor: 'pointer' },
+  btnPrimary: { width: '100%', backgroundColor: '#22B15B', color: '#FFFFFF', border: 'none', borderRadius: '14px', padding: '16px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' },
+  dividerRow: { display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' },
+  dividerLine: { flex: 1, height: '1px', backgroundColor: '#222222' },
+  dividerText: { color: '#8E8E93', fontSize: '12px' },
+  btnSecondary: { width: '100%', backgroundColor: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' },
+  registerText: { textAlign: 'center', fontSize: '13px', color: '#8E8E93', marginTop: '24px', marginHeight: 0 },
+  securityFooter: { color: '#8E8E93', fontSize: '12px', marginTop: '30px', display: 'flex', gap: '6px', alignItems: 'center' },
+
+  // Dashboard Styles
+  pageTitle: { fontSize: '24px', fontWeight: '700', margin: 0 },
+  kpiGrid: { display: 'flex', gap: '12px' },
+  kpiCard: { backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '16px', padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' },
+  kpiTitle: { fontSize: '12px', color: '#8E8E93' },
+  kpiMainValue: { fontSize: '18px', fontWeight: '700' },
+  trendUp: { color: '#22B15B', fontSize: '11px', fontWeight: '600' },
+  statusStable: { color: '#8E8E93', fontSize: '11px' },
+  achievementBanner: { backgroundColor: '#00A859', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' },
+  bannerIconBox: { fontSize: '24px', backgroundColor: 'rgba(255, 255, 255, 0.15)', width: '38px', height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  bannerTextBox: { flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' },
+  bannerTitle: { fontSize: '14px', fontWeight: '700' },
+  bannerSub: { fontSize: '12px', opacity: 0.9 },
+  bannerArrow: { fontSize: '16px', display: 'flex', alignItems: 'center' },
+  sectionHeader: { fontSize: '16px', fontWeight: '600', margin: '10px 0 0 0' },
+  chartWrapper: { backgroundColor: '#111111', borderRadius: '16px', padding: '20px', display: 'flex', gap: '15px', height: '150px' },
+  chartYAxis: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: '#8E8E93', fontSize: '11px' },
+  chartArea: { flex: 1, borderLeft: '1px solid #222', borderBottom: '1px solid #222', position: 'relative', overflow: 'hidden' },
+  chartLineMock: { position: 'absolute', bottom: '30px', left: 0, right: 0, height: '4px', backgroundColor: '#00A859', boxShadow: '0 0 12px #00A859' },
+
+  // Nueva Venta Styles
+  mainScannerCard: { backgroundColor: '#00A859', borderRadius: '20px', padding: '30px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' },
+  scannerHeaderTitle: { fontSize: '18px', fontWeight: '700', marginBottom: '4px' },
+  scannerHeaderSub: { fontSize: '12px', opacity: 0.9, marginBottom: '20px' },
+  scannerFrameTarget: { width: '80px', height: '80px', border: '2px dashed #FFFFFF', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', position: 'relative' },
+  scannerLaser: { position: 'absolute', left: 0, right: 0, height: '2px', backgroundColor: '#FF3B30', top: '50%' },
+  searchBarContainer: { backgroundColor: '#111111', borderRadius: '12px', padding: '14px', display: 'flex', gap: '10px', alignItems: 'center', color: '#8E8E93' },
+  searchInput: { background: 'none', border: 'none', color: '#FFF', flex: 1, fontSize: '14px', outline: 'none' },
+  cartList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  cartItem: { backgroundColor: '#111111', borderRadius: '16px', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  cartItemLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
+  productAvatar: { fontSize: '18px', backgroundColor: '#161616', border: '1px solid #222', padding: '8px', borderRadius: '8px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  productName: { fontSize: '14px', fontWeight: '600' },
+  productPriceText: { fontSize: '12px', color: '#8E8E93', marginTop: '2px' },
+  cartItemRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' },
+  qtyCounter: { backgroundColor: '#1C1C1E', borderRadius: '8px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', fontWeight: '600' },
+  itemTotalRow: { fontSize: '14px', fontWeight: '700' },
+  checkoutSummaryCard: { borderTop: '1px solid #1C1C1E', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  summaryRow: { display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#8E8E93' },
+  greenText: { color: '#22B15B' },
+  totalRowBlock: { display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800', marginTop: '6px', borderTop: '1px dashed #222', paddingTop: '10px' },
+  totalPriceValue: { color: '#22B15B' },
+  btnPrimaryAction: { backgroundColor: '#22B15B', color: '#FFFFFF', border: 'none', borderRadius: '16px', padding: '16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginTop: '10px' },
+
+  // Navigation Bar Styles
+  bottomTabNavigation: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#111111', borderTop: '1px solid #1C1C1E', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 20, paddingBottom: '5px' },
+  tabItem: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#8E8E93', fontSize: '11px', cursor: 'pointer', width: '60px' },
+  tabItemActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#FFFFFF', fontSize: '11px', cursor: 'pointer', width: '60px' },
+  tabItemActiveGreen: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#22B15B', fontSize: '11px', fontWeight: '600', cursor: 'pointer', width: '60px' },
+  centerFloatingBtn: { width: '52px', height: '52px', backgroundColor: '#00A859', borderRadius: '50%', border: 'none', color: '#FFFFFF', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '-24px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 168, 89, 0.4)' }
+};
