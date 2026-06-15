@@ -20,7 +20,7 @@ import {
   Camera,
   ChevronRight,
   Bell,
-  MoreHorizontal,
+  Scan,
   X,
   Receipt,
   Search
@@ -835,9 +835,9 @@ function App() {
                 <span>Ventas</span>
               </button>
 
-              {/* Los 3 puntos abajo a la derecha ahora activan el escáner */}
-              <button className="nav-item key-action-scanner" onClick={handleScan} aria-label="Escanear producto rápido">
-                <MoreHorizontal size={20} />
+              {/* NUEVO: Botón de Escáner Directo */}
+              <button className="nav-item active-green" onClick={handleScan} aria-label="Escanear producto rápido">
+                <Scan size={22} />
                 <span>Escanear</span>
               </button>
             </nav>

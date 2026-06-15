@@ -1370,13 +1370,16 @@ body {
 }
 
 /* Estilo destacado si deseas que el botón de los 3 puntos se vea interactivo */
-.nav-item.key-action-scanner {
+.nav-item.active-green {
     color: #22B15B !important;
 }
 
-.nav-item.key-action-scanner svg {
+.nav-item.active-green svg {
+    width: 22px;
+    height: 22px;
     stroke: #22B15B !important;
     filter: drop-shadow(0 0 4px rgba(34, 177, 91, 0.4));
+    margin-bottom: 4px;
 }
 
 /* Sidebar Drawer & Overlay */
