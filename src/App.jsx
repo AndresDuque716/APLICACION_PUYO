@@ -19,12 +19,14 @@ import {
   Trash2,
   Camera,
   ChevronRight,
+  ChevronLeft,
   Bell,
   Scan,
   X,
   Receipt,
   Search,
-  Minus
+  Minus,
+  SlidersHorizontal
 } from 'lucide-react';
 
 // Pre-defined products database for scanning simulation & catalog
@@ -406,79 +408,128 @@ function DashboardScreen({ onMetaClick }) {
 // 3. COMPONENTE: CATÁLOGO DE PRODUCTOS
 // ==========================================
 function ProductosScreen({ onAddProduct }) {
+  const [categoriaActiva, setCategoriaActiva] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const filteredProducts = PRODUCT_DATABASE.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.barcode.includes(searchQuery)
-  );
+
+  // Compute category counts dynamically based on PRODUCT_DATABASE
+  const categorias = [
+    { nombre: 'Todos', cant: PRODUCT_DATABASE.length },
+    { nombre: 'Bebidas', cant: PRODUCT_DATABASE.filter(p => p.category === 'Bebidas').length },
+    { nombre: 'Snacks', cant: PRODUCT_DATABASE.filter(p => p.category === 'Snacks').length },
+    { nombre: 'Golosinas', cant: PRODUCT_DATABASE.filter(p => p.category === 'Golosinas').length },
+    { nombre: 'Abarrotes', cant: PRODUCT_DATABASE.filter(p => p.category === 'Abarrotes').length },
+    { nombre: 'Lácteos', cant: PRODUCT_DATABASE.filter(p => p.category === 'Lácteos').length }
+  ];
+
+  const filteredProducts = PRODUCT_DATABASE.filter(p => {
+    const matchesCategory = categoriaActiva === 'Todos' || p.category === categoriaActiva;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.barcode.includes(searchQuery);
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div style={styles.scrollContent}>
+      {/* Encabezado del Módulo */}
       <div style={styles.headerBiblioteca}>
-        <h2 style={styles.pageTitle}>Biblioteca de Productos</h2>
-        <button style={styles.btnAñadirProducto} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo</button>
+        <div>
+          <h2 style={styles.pageTitle}>Productos</h2>
+          <span style={styles.subtextHeader}>Total: {PRODUCT_DATABASE.length} productos</span>
+        </div>
+        <button style={styles.btnAñadirProducto} onClick={() => alert('Nuevo producto próximamente.')}>+ Nuevo producto</button>
       </div>
 
-      <div style={styles.searchBarContainer}>
-        <Search size={18} style={{ color: '#8E8E93' }} />
-        <input 
-          type="text" 
-          placeholder="Buscar en el inventario..." 
-          style={styles.searchInput} 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      {/* Barra de Búsqueda y Filtros */}
+      <div style={styles.searchRowContainer}>
+        <div style={styles.searchBarContainerExpanded}>
+          <Search size={18} style={{ color: '#8E8E93' }} />
+          <input 
+            type="text" 
+            placeholder="Buscar producto..." 
+            style={styles.searchInput} 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <button style={styles.btnFiltroIcon} onClick={() => alert('Filtros avanzados próximamente.')}>
+          <SlidersHorizontal size={16} /> Filtros
+        </button>
       </div>
 
-      <div style={styles.productsLibraryGrid}>
+      {/* Pastillas de Categorías Horizontales */}
+      <div style={styles.categoriesHorizontalScroll}>
+        {categorias.map((cat) => (
+          <button 
+            key={cat.nombre} 
+            onClick={() => setCategoriaActiva(cat.nombre)}
+            style={categoriaActiva === cat.nombre ? styles.tagCategoryActive : styles.tagCategoryInactive}
+          >
+            {cat.nombre} <span style={styles.tagCountBadge}>{cat.cant}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* LISTA DE PRODUCTOS ORGANIZADA EN FILAS */}
+      <div style={styles.productRowsListContainer}>
         {filteredProducts.map((prod) => (
-          <div key={prod.id} style={styles.productCatalogCard}>
-            <div style={styles.imageContainer}>
-              <img src={prod.image} alt={prod.name} style={styles.productCatalogImage} />
-              {prod.stock === 0 && <span style={styles.badgeAgotado}>Agotado</span>}
-              {prod.stock <= 5 && prod.stock > 0 && <span style={styles.badgeBajoStock}>Stock Bajo</span>}
+          <div 
+            key={prod.id} 
+            style={{
+              ...styles.productListItemRow,
+              opacity: prod.stock === 0 ? 0.6 : 1,
+              cursor: prod.stock === 0 ? 'not-allowed' : 'pointer'
+            }}
+            onClick={() => {
+              if (prod.stock > 0) {
+                onAddProduct(prod);
+                alert(`${prod.name} agregado a la venta.`);
+              } else {
+                alert('Este producto no tiene stock disponible.');
+              }
+            }}
+          >
+            <div style={styles.productListLeftSection}>
+              <img src={prod.image} alt={prod.name} style={styles.productRowThumbnailImage} />
+              <div style={styles.productRowDetailsBlock}>
+                <div style={styles.productRowTitleName}>{prod.name}</div>
+                <div style={styles.productRowSubDetails}>
+                  <span style={styles.productRowCategoryLabel}>{prod.category}</span>
+                  <span style={styles.productRowDivider}>|</span>
+                  <span style={styles.productRowBarcodeText}>Código: {prod.barcode}</span>
+                </div>
+              </div>
             </div>
             
-            <div style={styles.productCatalogInfo}>
-              <span style={styles.productCatalogCategory}>{prod.category}</span>
-              <div style={styles.productCatalogName}>{prod.name}</div>
-              <div style={styles.productCatalogFooterRow}>
-                <span style={styles.productCatalogPrice}>S/ {prod.price.toFixed(2)}</span>
-                <span style={prod.stock === 0 ? styles.stockTextRed : styles.stockTextGeneric}>Cant: {prod.stock}</span>
+            <div style={styles.productListRightSection}>
+              <div style={styles.productRowStockBlock}>
+                <span style={styles.stockLabelTitle}>Stock</span>
+                <span style={prod.stock <= 5 ? styles.stockValueAlertNumber : styles.stockValueNormalNumber}>
+                  {prod.stock}
+                </span>
               </div>
-              <button 
-                style={{
-                  width: '100%',
-                  marginTop: '10px',
-                  backgroundColor: prod.stock === 0 ? '#222' : '#22B15B',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '8px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: prod.stock === 0 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  transition: 'background-color 0.2s'
-                }}
-                disabled={prod.stock === 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (prod.stock > 0) {
-                    onAddProduct(prod);
-                  }
-                }}
-              >
-                {prod.stock === 0 ? 'Sin Stock' : 'Agregar'}
-              </button>
+              <div style={styles.productRowPriceValue}>S/ {prod.price.toFixed(2)}</div>
+              <span style={styles.rowChevronArrow}>
+                <ChevronRight size={18} />
+              </span>
             </div>
           </div>
         ))}
+      </div>
+
+      {/* PAGINACIÓN INFERIOR */}
+      <div style={styles.paginationFooterRow}>
+        <button style={styles.arrowPaginationBtn} onClick={() => alert('Anterior página')} aria-label="Página anterior">
+          <ChevronLeft size={16} />
+        </button>
+        <button style={styles.pageNumberBtnActive}>1</button>
+        <button style={styles.pageNumberBtn} onClick={() => alert('Página 2')}>2</button>
+        <button style={styles.pageNumberBtn} onClick={() => alert('Página 3')}>3</button>
+        <span style={styles.paginationEllipsis}>...</span>
+        <button style={styles.pageNumberBtn} onClick={() => alert('Última página')}>8</button>
+        <button style={styles.arrowPaginationBtn} onClick={() => alert('Siguiente página')} aria-label="Siguiente página">
+          <ChevronRight size={16} />
+        </button>
       </div>
     </div>
   );
@@ -1001,21 +1052,46 @@ const styles = {
   scrollContent: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1200px', margin: '0 auto', width: '100%' },
   
   // Biblioteca Grid Styles
-  headerBiblioteca: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  btnAñadirProducto: { backgroundColor: '#22B15B', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' },
-  productsLibraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginTop: '10px' },
-  productCatalogCard: { backgroundColor: '#111111', borderRadius: '16px', border: '1px solid #1C1C1E', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  imageContainer: { width: '100%', height: '120px', position: 'relative', backgroundColor: '#161616' },
-  productCatalogImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  badgeAgotado: { position: 'absolute', top: '8px', left: '8px', backgroundColor: '#FF3B30', color: '#fff', fontSize: '10px', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
-  badgeBajoStock: { position: 'absolute', top: '8px', left: '8px', backgroundColor: '#FF9500', color: '#fff', fontSize: '10px', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
-  productCatalogInfo: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
-  productCatalogCategory: { fontSize: '10px', color: '#8E8E93', textTransform: 'uppercase', fontWeight: 'bold' },
-  productCatalogName: { fontSize: '13px', fontWeight: '600', color: '#FFFFFF', minHeight: '36px' },
-  productCatalogFooterRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' },
-  productCatalogPrice: { fontSize: '14px', fontWeight: '700', color: '#22B15B' },
-  stockTextGeneric: { fontSize: '11px', color: '#8E8E93' },
-  stockTextRed: { fontSize: '11px', color: '#FF3B30', fontWeight: 'bold' },
+  headerBiblioteca: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' },
+  pageTitle: { fontSize: '22px', fontWeight: '700', margin: 0 },
+  subtextHeader: { fontSize: '12px', color: '#22B15B', fontWeight: '600' },
+  btnAñadirProducto: { backgroundColor: '#22B15B', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+  
+  searchRowContainer: { display: 'flex', gap: '12px', alignItems: 'center', width: '100%' },
+  searchBarContainerExpanded: { backgroundColor: '#111111', borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '10px', alignItems: 'center', color: '#8E8E93', flex: 1, border: '1px solid #1C1C1E' },
+  btnFiltroIcon: { backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '12px', color: '#FFFFFF', padding: '12px 14px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
+  
+  categoriesHorizontalScroll: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', width: '100%' },
+  tagCategoryActive: { backgroundColor: '#22B15B', color: '#FFFFFF', border: 'none', padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' },
+  tagCategoryInactive: { backgroundColor: '#111111', color: '#8E8E93', border: '1px solid #1C1C1E', padding: '8px 16px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' },
+  tagCountBadge: { fontSize: '11px', opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '8px' },
+
+  // Lista en Filas Organizadas (Product List Rows)
+  productRowsListContainer: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' },
+  productListItemRow: { backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '16px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
+  productListLeftSection: { display: 'flex', alignItems: 'center', gap: '14px', flex: 1 },
+  productRowThumbnailImage: { width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover', backgroundColor: '#161616' },
+  productRowDetailsBlock: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  productRowTitleName: { fontSize: '14px', fontWeight: '600', color: '#FFFFFF' },
+  productRowSubDetails: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' },
+  productRowCategoryLabel: { color: '#22B15B', fontWeight: '500' },
+  productRowDivider: { color: '#3A3A3C' },
+  productRowBarcodeText: { color: '#8E8E93' },
+  
+  productListRightSection: { display: 'flex', alignItems: 'center', gap: '16px' },
+  productRowStockBlock: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' },
+  stockLabelTitle: { fontSize: '10px', color: '#8E8E93', textTransform: 'uppercase' },
+  stockValueNormalNumber: { fontSize: '14px', fontWeight: '700', color: '#22B15B' },
+  stockValueAlertNumber: { fontSize: '14px', fontWeight: '700', color: '#FF9500' },
+  productRowPriceValue: { fontSize: '15px', fontWeight: '700', color: '#FFFFFF', width: '65px', textAlign: 'right' },
+  rowChevronArrow: { color: '#3A3A3C', fontSize: '12px', display: 'flex', alignItems: 'center' },
+
+  // Paginación
+  paginationFooterRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginTop: '16px', padding: '10px 0' },
+  pageNumberBtn: { backgroundColor: '#111111', border: '1px solid #1C1C1E', color: '#8E8E93', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' },
+  pageNumberBtnActive: { backgroundColor: '#22B15B', border: 'none', color: '#FFFFFF', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' },
+  arrowPaginationBtn: { backgroundColor: '#111111', border: '1px solid #1C1C1E', color: '#FFFFFF', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  paginationEllipsis: { color: '#48484A', padding: '0 4px' },
   
   // Login Styles
   loginContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', minHeight: '85vh' },
