@@ -717,10 +717,10 @@ export default function VendixApp() {
   };
 
   return (
-    <div style={styles.deviceViewport}>
+    <div style={styles.deviceViewport} className="app-container">
       {/* HEADER PRINCIPAL (Oculto en Login o en Venta Completa Escáner) */}
       {currentRoute !== 'login' && currentRoute !== 'scanner' && (
-        <header style={styles.navbarTop}>
+        <header style={styles.navbarTop} className="app-header">
           {/* 3 RAYITAS ARRIBA A LA IZQUIERDA */}
           <button style={styles.hamburgerBtn} onClick={() => setSidebarOpen(true)}>
              <Menu size={24} />
