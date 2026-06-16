@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import logoImg from './assets/logo.png';
+import { FacebookLogin } from '@capacitor-community/facebook-login';
 import { 
   User, 
   Lock, 
@@ -116,6 +117,8 @@ const PRODUCT_DATABASE = [
 // ==========================================
 // 1. COMPONENTE: LOGIN (Pantalla de Acceso)
 // ==========================================
+const FACEBOOK_APP_ID = "YOUR_FACEBOOK_APP_ID";
+
 function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -195,6 +198,55 @@ function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword })
           <div style={styles.dividerLine}></div>
           <span style={styles.dividerText}>o continúa con</span>
           <div style={styles.dividerLine}></div>
+        </div>
+
+        <div style={styles.socialButtonsRow}>
+          <button style={styles.btnGoogle} onClick={() => {
+            setEmail('google.user@vendix.com');
+            alert('Vinculando con Google...');
+            setTimeout(() => onLoginSuccess(), 800);
+          }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" style={{ marginRight: '8px' }}>
+              <path fill="#EA4335" d="M12 5.04c1.62 0 3.08.56 4.22 1.65l3.15-3.15C17.45 1.84 14.97 1 12 1 7.35 1 3.37 3.66 1.43 7.56l3.87 3A7 7 0 0 1 12 5.04z" />
+              <path fill="#4285F4" d="M23.73 12.25c0-.82-.07-1.61-.21-2.38H12v4.51h6.6c-.29 1.48-1.12 2.73-2.38 3.58l3.7 2.87c2.16-2 3.41-4.94 3.41-8.58z" />
+              <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.7-2.87c-1.03.69-2.35 1.1-4.26 1.1-3.28 0-6.06-2.21-7.05-5.19l-3.87 3C5.07 19.86 8.24 23 12 23z" />
+              <path fill="#FBBC05" d="M4.95 13.12A7 7 0 0 1 4.95 10.88L1.08 7.88a11.96 11.96 0 0 0 0 8.24l3.87-3z" />
+            </svg>
+            Google
+          </button>
+          <button style={styles.btnFacebook} onClick={async () => {
+            try {
+              let appId = FACEBOOK_APP_ID;
+              if (appId === "YOUR_FACEBOOK_APP_ID") {
+                window.open("https://www.facebook.com", "_blank");
+                return;
+              }
+              
+              // Inicializar SDK de Facebook
+              await FacebookLogin.initialize({ appId });
+              
+              // Intentar login
+              const permissions = ['public_profile', 'email'];
+              const result = await FacebookLogin.login({ permissions });
+              
+              if (result && result.accessToken) {
+                console.log('Facebook Login exitoso:', result.accessToken);
+                setEmail('facebook.user@vendix.com');
+                alert('¡Vinculación con Facebook exitosa!');
+                onLoginSuccess();
+              } else {
+                alert('No se pudo obtener el token de acceso de Facebook.');
+              }
+            } catch (err) {
+              console.error(err);
+              window.open("https://www.facebook.com", "_blank");
+            }
+          }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="#1877F2" style={{ marginRight: '8px' }}>
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            Facebook
+          </button>
         </div>
 
         <button style={styles.btnSecondary} onClick={() => {
@@ -1373,6 +1425,9 @@ const styles = {
   dividerRow: { display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' },
   dividerLine: { flex: 1, height: '1px', backgroundColor: '#222222' },
   dividerText: { color: '#8E8E93', fontSize: '12px' },
+  socialButtonsRow: { display: 'flex', gap: '12px', marginBottom: '16px' },
+  btnGoogle: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616', color: '#FFFFFF', border: '1px solid #222222', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  btnFacebook: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616', color: '#FFFFFF', border: '1px solid #222222', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   btnSecondary: { width: '100%', backgroundColor: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' },
   registerText: { textAlign: 'center', fontSize: '13px', color: '#8E8E93', marginTop: '24px', marginHeight: 0 },
   securityFooter: { color: '#8E8E93', fontSize: '12px', marginTop: '30px', display: 'flex', gap: '6px', alignItems: 'center' },
