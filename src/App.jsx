@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import logoImg from './assets/logo.png';
+import logoJpeg from './assets/logo.jpeg';
 import { FacebookLogin } from '@capacitor-community/facebook-login';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { 
   User, 
   Lock, 
@@ -27,7 +29,13 @@ import {
   Receipt,
   Search,
   Minus,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ChevronDown,
+  MoreHorizontal,
+  AlertTriangle,
+  DollarSign,
+  Users,
+  Target
 } from 'lucide-react';
 
 // Pre-defined products database for scanning simulation & catalog
@@ -115,6 +123,115 @@ const PRODUCT_DATABASE = [
 ];
 
 // ==========================================
+// 0. COMPONENTE: SPLASH SCREEN (Pantalla de Carga)
+// ==========================================
+function SplashScreen({ progress, isExiting }) {
+  return (
+    <div style={{ 
+      backgroundColor: '#080808', 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Glows de fondo */}
+      <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(0, 210, 106, 0.08) 0%, transparent 70%)', zIndex: 1, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(0, 210, 106, 0.08) 0%, transparent 70%)', zIndex: 1, pointerEvents: 'none' }} />
+
+      {/* Fondo Vectorial (Ondas) en esquina superior izquierda */}
+      <svg 
+        style={{ position: 'absolute', top: 0, left: 0, width: '220px', height: '220px', opacity: 0.12, pointerEvents: 'none', zIndex: 1 }}
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="0" cy="0" r="20" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="30" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="40" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="50" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="60" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="70" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="80" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="90" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="0" cy="0" r="100" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+      </svg>
+
+      {/* Fondo Vectorial (Ondas) en esquina inferior derecha */}
+      <svg 
+        style={{ position: 'absolute', bottom: 0, right: 0, width: '220px', height: '220px', opacity: 0.12, pointerEvents: 'none', zIndex: 1 }}
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="100" cy="100" r="20" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="30" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="40" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="50" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="60" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="70" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="90" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+        <circle cx="100" cy="100" r="100" fill="none" stroke="#00d26a" strokeWidth="0.5" />
+      </svg>
+
+      {/* Contenedor del Logo, Isotipo y Nombre */}
+      <div style={{ 
+        textAlign: 'center', 
+        zIndex: 2, 
+        marginBottom: '40px',
+        animation: isExiting 
+          ? 'fadeOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards'
+          : 'fadeInScale 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards'
+      }}>
+        {/* Isotipo (Logo de Barras + Check) */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+          <svg width="100" height="100" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 16.5 L6.5 13.5 V21 H3 V16.5 Z" fill="#00d26a" />
+            <path d="M8.5 11.5 L12 8.5 V21 H8.5 V11.5 Z" fill="#00d26a" />
+            <path d="M14 6.5 L17.5 3.5 V21 H14 V6.5 Z" fill="#00d26a" />
+            <path d="M2 18 L19.5 3" stroke="#00d26a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M13.5 3 H19.5 V9" stroke="#00d26a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        
+        {/* Nombre de la marca en Blanco */}
+        <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: '#FFFFFF', margin: '0 0 10px 0', letterSpacing: '0.5px' }}>
+          Vendix
+        </h1>
+        
+        {/* Eslogan */}
+        <p style={{ fontSize: '16px', color: '#aaaaaa', margin: '0', fontWeight: '500' }}>
+          Controla. Vende. <span style={{ color: '#00d26a', fontWeight: '700' }}>Crece.</span>
+        </p>
+      </div>
+
+      {/* Riel de la barra de carga en Gris Oscuro */}
+      <div style={{ 
+        width: '60%', 
+        maxWidth: '250px', 
+        height: '6px', 
+        backgroundColor: '#222222', 
+        borderRadius: '3px', 
+        overflow: 'hidden', 
+        zIndex: 2,
+        animation: isExiting 
+          ? 'fadeOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards'
+          : 'fadeInScale 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards'
+      }}>
+        {/* El progreso de la barra llenándose con el Verde Brillante */}
+        <div style={{
+          width: `${progress}%`,
+          height: '100%',
+          backgroundColor: '#00d26a',
+          transition: 'width 0.05s linear'
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // 1. COMPONENTE: LOGIN (Pantalla de Acceso)
 // ==========================================
 const FACEBOOK_APP_ID = "YOUR_FACEBOOK_APP_ID";
@@ -134,15 +251,23 @@ function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword })
 
   return (
     <div style={styles.loginContainer}>
-      <div style={styles.brandHeader}>
+      <div style={{
+        ...styles.brandHeader,
+        animation: 'slideUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards'
+      }}>
         <div style={styles.logoWrapper}>
           <img src={logoImg} alt="Vendix Logo" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
           <h1 style={styles.logoText}>Vendix</h1>
         </div>
-        <p style={styles.slogan}>Controla. Vende. Crece.</p>
+        <p style={{ ...styles.slogan, color: '#aaaaaa' }}>
+          Controla. Vende. <span style={{ color: '#00d26a', fontWeight: '700' }}>Crece.</span>
+        </p>
       </div>
 
-      <div style={styles.loginCard}>
+      <div style={{
+        ...styles.loginCard,
+        animation: 'slideUp 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards'
+      }}>
         <h2 style={styles.cardTitle}>Bienvenido</h2>
         <p style={styles.cardSubtitle}>Ingresa tus credenciales para acceder a Vendix.</p>
         
@@ -351,105 +476,255 @@ function DashboardScreen({ onMetaClick }) {
         transition: isBouncing ? 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none'
       }}
     >
-      <h2 style={styles.pageTitle}>Dashboard Principal</h2>
-      
-      {/* Grid de KPIs */}
-      <div style={styles.kpiGrid}>
-        <div style={styles.kpiCard}>
-          <span style={styles.kpiTitle}>Ventas de Hoy</span>
-          <span style={styles.kpiMainValue}>S/ 1,240.00</span>
-          <span style={styles.trendUp}>
-            <TrendingUp size={11} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'middle' }} /> +12.5% 
-          </span>
+      {/* 1. Greeting row & selectors */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '4px' }}>
+        <div>
+          <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#FFFFFF', margin: 0 }}>¡Bienvenido, Juan!</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', cursor: 'pointer' }} onClick={() => alert('Cambiar sucursal.')}>
+            <span style={{ fontSize: '13px', color: '#00d26a', fontWeight: '600' }}>Bodega San Martín</span>
+            <ChevronDown size={14} style={{ color: '#00d26a' }} />
+          </div>
         </div>
-        <div style={styles.kpiCard}>
-          <span style={styles.kpiTitle}>Transacciones</span>
-          <span style={styles.kpiMainValue}>84</span>
-          <span style={styles.trendUp}>
-            <TrendingUp size={11} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'middle' }} /> +8.3% 
-          </span>
-        </div>
-        <div style={styles.kpiCard}>
-          <span style={styles.kpiTitle}>Ticket Promedio</span>
-          <span style={styles.kpiMainValue}>S/ 14.80</span>
-          <span style={styles.statusStable}>Estable</span>
+        
+        {/* Dropdown "Hoy" */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          backgroundColor: '#111111', 
+          border: '1px solid #1C1C1E', 
+          borderRadius: '10px', 
+          padding: '8px 12px',
+          cursor: 'pointer'
+        }} onClick={() => alert('Seleccionar rango de fecha.')}>
+          <Calendar size={14} style={{ color: '#8E8E93' }} />
+          <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: '600' }}>Hoy</span>
+          <ChevronDown size={14} style={{ color: '#8E8E93' }} />
         </div>
       </div>
 
-      {/* Banner de Logro */}
-      <div style={styles.achievementBanner} onClick={onMetaClick}>
-        <div style={styles.bannerIconBox}>
-          <ShoppingBag size={20} />
+      {/* 2. Grid de KPIs (3 columnas, 2 filas) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        {/* Ventas del día */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShoppingCart size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Ventas del día</span>
+          </div>
+          <span style={styles.kpiValueCustom}>S/ 1,250.00</span>
+          <span style={{ fontSize: '10px', color: '#00d26a', fontWeight: '600', marginTop: '2px' }}>↗ 12.5% vs ayer</span>
         </div>
-        <div style={styles.bannerTextBox}>
-          <span style={styles.bannerTitle}>¡Felicidades! Superaste tu meta</span>
-          <span style={styles.bannerSub}>Sigue vendiendo para alcanzar el logro diario.</span>
+
+        {/* Ganancias */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShoppingBag size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Ganancias</span>
+          </div>
+          <span style={styles.kpiValueCustom}>S/ 420.00</span>
+          <span style={{ fontSize: '10px', color: '#00d26a', fontWeight: '600', marginTop: '2px' }}>↗ 8.3% vs ayer</span>
         </div>
-        <span style={styles.bannerArrow}>
-          <ArrowRight size={18} />
-        </span>
+
+        {/* Órdenes / Ventas */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Receipt size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Órdenes / Ventas</span>
+          </div>
+          <span style={styles.kpiValueCustom}>15</span>
+          <span style={{ fontSize: '10px', color: '#00d26a', fontWeight: '600', marginTop: '2px' }}>↗ 7.1% vs ayer</span>
+        </div>
+
+        {/* Productos vendidos */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Package size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Productos vendidos</span>
+          </div>
+          <span style={styles.kpiValueCustom}>32</span>
+          <span style={{ fontSize: '10px', color: '#00d26a', fontWeight: '600', marginTop: '2px' }}>↗ 10.2% vs ayer</span>
+        </div>
+
+        {/* Stock total */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Package size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Stock total</span>
+          </div>
+          <span style={styles.kpiValueCustom}>1,248</span>
+          <span style={{ fontSize: '10px', color: '#8E8E93', fontWeight: '500', marginTop: '2px' }}>productos</span>
+        </div>
+
+        {/* Clientes atendidos */}
+        <div style={styles.kpiCardCustom}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Users size={16} style={{ color: '#00d26a' }} />
+            <span style={styles.kpiTitleCustom}>Clientes atendidos</span>
+          </div>
+          <span style={styles.kpiValueCustom}>18</span>
+          <span style={{ fontSize: '10px', color: '#00d26a', fontWeight: '600', marginTop: '2px' }}>↗ 5.6% vs ayer</span>
+        </div>
       </div>
 
-      {/* Gráfico Analítico Simulado */}
-      <h3 style={styles.sectionHeader}>Tendencia de Ventas</h3>
-      <div style={styles.chartWrapper}>
-        <div style={styles.chartYAxis}>
-          <span>1.5K</span><span>1.0K</span><span>500</span><span>0</span>
+      {/* 3. Gráfico de la semana */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>Ventas de la semana</h3>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            backgroundColor: '#111111', 
+            border: '1px solid #1C1C1E', 
+            borderRadius: '8px', 
+            padding: '6px 10px',
+            cursor: 'pointer'
+          }} onClick={() => alert('Seleccionar período.')}>
+            <span style={{ fontSize: '12px', color: '#FFFFFF', fontWeight: '600' }}>Esta semana</span>
+            <ChevronDown size={12} style={{ color: '#8E8E93' }} />
+          </div>
         </div>
-        <div style={{ ...styles.chartArea, display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
-          {/* Beautiful SVG Graph of green waves */}
-          <svg style={{ width: '100%', height: '110px', overflow: 'visible' }}>
-            <defs>
-              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#00A859" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#00A859" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-            <path d="M 0 110 L 0 90 Q 30 80 60 75 Q 90 70 120 85 Q 150 100 180 55 Q 210 20 240 30 Q 270 40 300 20 L 300 110 Z" fill="url(#chartGrad)" />
-            <path d="M 0 90 Q 30 80 60 75 Q 90 70 120 85 Q 150 100 180 55 Q 210 20 240 30 Q 270 40 300 20" fill="none" stroke="#00A859" strokeWidth="3" strokeLinecap="round" />
-            <circle cx="0" cy="90" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-            <circle cx="60" cy="75" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-            <circle cx="120" cy="85" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-            <circle cx="180" cy="55" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-            <circle cx="240" cy="30" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-            <circle cx="300" cy="20" r="4.5" fill="#FFFFFF" stroke="#00A859" strokeWidth="2.5" />
-          </svg>
+
+        <div style={{ backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '16px', padding: '16px 16px 32px 16px', display: 'flex', gap: '12px', height: '160px', position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: '#8E8E93', fontSize: '10px', paddingBottom: '10px', height: '100%' }}>
+            <span>1.5K</span><span>1K</span><span>500</span><span>0</span>
+          </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'visible', height: '100%' }}>
+            <svg style={{ width: '100%', height: '100%', overflow: 'visible' }} viewBox="0 0 300 100" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00d26a" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#00d26a" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {/* Horizontal Grid Lines */}
+              <line x1="0" y1="10" x2="300" y2="10" stroke="#1C1C1E" strokeWidth="1" />
+              <line x1="0" y1="36.7" x2="300" y2="36.7" stroke="#1C1C1E" strokeWidth="1" />
+              <line x1="0" y1="63.3" x2="300" y2="63.3" stroke="#1C1C1E" strokeWidth="1" />
+              <line x1="0" y1="90" x2="300" y2="90" stroke="#1C1C1E" strokeWidth="1" />
+
+              {/* Curve path fitting the 3.jpeg values */}
+              <path d="M 20,90 C 40,85 50,75 63,70 C 80,63 90,52 106,50 C 122,48 135,58 150,55 C 165,52 180,35 193,30 C 206,25 220,65 236,60 C 252,55 265,25 280,15 L 280,90 L 20,90 Z" fill="url(#chartGlow)" />
+              <path d="M 20,90 C 40,85 50,75 63,70 C 80,63 90,52 106,50 C 122,48 135,58 150,55 C 165,52 180,35 193,30 C 206,25 220,65 236,60 C 252,55 265,25 280,15" fill="none" stroke="#00d26a" strokeWidth="3" strokeLinecap="round" />
+              
+              {/* Dots for daily readings */}
+              <circle cx="20" cy="90" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="63" cy="70" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="106" cy="50" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="150" cy="55" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="193" cy="30" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="236" cy="60" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+              <circle cx="280" cy="15" r="4.5" fill="#FFFFFF" stroke="#00d26a" strokeWidth="2" />
+            </svg>
+            {/* Absolute positioned X-Axis Labels to align perfectly with the dots */}
+            <div style={{ position: 'absolute', bottom: '-22px', left: 0, right: 0, height: '20px', color: '#8E8E93', fontSize: '10px' }}>
+              <span style={{ position: 'absolute', left: '6.67%', transform: 'translateX(-50%)' }}>Lun</span>
+              <span style={{ position: 'absolute', left: '21.0%', transform: 'translateX(-50%)' }}>Mar</span>
+              <span style={{ position: 'absolute', left: '35.3%', transform: 'translateX(-50%)' }}>Mié</span>
+              <span style={{ position: 'absolute', left: '50.0%', transform: 'translateX(-50%)' }}>Jue</span>
+              <span style={{ position: 'absolute', left: '64.3%', transform: 'translateX(-50%)' }}>Vie</span>
+              <span style={{ position: 'absolute', left: '78.7%', transform: 'translateX(-50%)' }}>Sáb</span>
+              <span style={{ position: 'absolute', left: '93.3%', transform: 'translateX(-50%)' }}>Dom</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Sección de Alertas Rápidas (Stock Bajo, Agotados, Cajas, Clientes) */}
-      <h3 style={styles.sectionHeader}>Alertas y Cajas</h3>
-      <div className="quick-info-grid">
-        <div className="alert-card warning">
-          <div className="alert-icon-box">
-            <AlertCircle size={16} />
-          </div>
-          <h4>Stock Bajo</h4>
-          <span className="alert-num">5</span>
+      {/* 4. Sección de Alertas importantes */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>Alertas importantes</h3>
+          <span style={{ fontSize: '13px', color: '#00d26a', fontWeight: '600', cursor: 'pointer' }} onClick={() => alert('Todas las alertas.')}>Ver todas</span>
         </div>
 
-        <div className="alert-card danger">
-          <div className="alert-icon-box">
-            <AlertCircle size={16} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Stock bajo */}
+          <div style={styles.alertRowCustom} onClick={() => alert('Detalles de productos con bajo stock.')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ backgroundColor: 'rgba(255, 149, 0, 0.1)', border: '1px solid rgba(255, 149, 0, 0.25)', padding: '8px', borderRadius: '8px', color: '#FF9500', display: 'flex', alignItems: 'center' }}>
+                <AlertTriangle size={18} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#FFFFFF' }}>Stock bajo</span>
+                <span style={{ fontSize: '11px', color: '#8E8E93' }}>5 productos con stock bajo</span>
+              </div>
+            </div>
+            <ChevronRight size={16} style={{ color: '#3A3A3C' }} />
           </div>
-          <h4>Agotados</h4>
-          <span className="alert-num">2</span>
-        </div>
 
-        <div className="alert-card info">
-          <div className="alert-icon-box">
-            <User size={16} />
+          {/* Productos agotados */}
+          <div style={styles.alertRowCustom} onClick={() => alert('Detalles de productos agotados.')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)', border: '1px solid rgba(255, 59, 48, 0.25)', padding: '8px', borderRadius: '8px', color: '#FF3B30', display: 'flex', alignItems: 'center' }}>
+                <Package size={18} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#FFFFFF' }}>Productos agotados</span>
+                <span style={{ fontSize: '11px', color: '#8E8E93' }}>3 productos sin stock</span>
+              </div>
+            </div>
+            <ChevronRight size={16} style={{ color: '#3A3A3C' }} />
           </div>
-          <h4>Cajas</h4>
-          <span className="alert-num">2</span>
-        </div>
 
-        <div className="alert-card success">
-          <div className="alert-icon-box">
-            <Check size={16} />
+          {/* Meta de ventas */}
+          <div style={styles.alertRowCustom} onClick={() => alert('Detalles de metas de ventas.')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ backgroundColor: 'rgba(10, 132, 255, 0.1)', border: '1px solid rgba(10, 132, 255, 0.25)', padding: '8px', borderRadius: '8px', color: '#0A84FF', display: 'flex', alignItems: 'center' }}>
+                <Target size={18} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#FFFFFF' }}>Meta de ventas</span>
+                <span style={{ fontSize: '11px', color: '#8E8E93' }}>Llevas el 85% de tu meta diaria</span>
+              </div>
+            </div>
+            <ChevronRight size={16} style={{ color: '#3A3A3C' }} />
           </div>
-          <h4>Clientes</h4>
-          <span className="alert-num">48</span>
+        </div>
+      </div>
+
+      {/* 5. Accesos rápidos */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>Accesos rápidos</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+          {/* Productos */}
+          <div style={styles.quickAccessCard} onClick={() => onMetaClick('products')}>
+            <div style={styles.quickAccessIconWrapper}>
+              <Package size={20} />
+            </div>
+            <span style={styles.quickAccessLabel}>Productos</span>
+          </div>
+
+          {/* Nueva venta */}
+          <div style={styles.quickAccessCard} onClick={() => onMetaClick('scanner')}>
+            <div style={styles.quickAccessIconWrapper}>
+              <ShoppingCart size={20} />
+            </div>
+            <span style={styles.quickAccessLabel}>Nueva venta</span>
+          </div>
+
+          {/* Ventas */}
+          <div style={styles.quickAccessCard} onClick={() => onMetaClick('sales')}>
+            <div style={styles.quickAccessIconWrapper}>
+              <Receipt size={20} />
+            </div>
+            <span style={styles.quickAccessLabel}>Ventas</span>
+          </div>
+
+          {/* Reportes */}
+          <div style={styles.quickAccessCard} onClick={() => alert('Reportes detallados disponibles pronto.')}>
+            <div style={styles.quickAccessIconWrapper}>
+              <TrendingUp size={20} />
+            </div>
+            <span style={styles.quickAccessLabel}>Reportes</span>
+          </div>
+
+          {/* Inventario */}
+          <div style={styles.quickAccessCard} onClick={() => onMetaClick('products')}>
+            <div style={styles.quickAccessIconWrapper}>
+              <Package size={20} />
+            </div>
+            <span style={styles.quickAccessLabel}>Inventario</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1019,7 +1294,9 @@ function NuevaVentaScreen({ cart, onAddQty, onSubQty, onDeleteItem, onScanClick,
 // 6. COMPONENTE CONTROLADOR (Raíz de la App)
 // ==========================================
 export default function VendixApp() {
-  const [currentRoute, setCurrentRoute] = useState('login'); // 'login', 'dashboard', 'scanner', 'products', 'sales'
+  const [currentRoute, setCurrentRoute] = useState('splash'); // 'splash', 'login', 'dashboard', 'scanner', 'products', 'sales'
+  const [progress, setProgress] = useState(0);
+  const [isExiting, setIsExiting] = useState(false);
   const [products, setProducts] = useState(PRODUCT_DATABASE);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1027,15 +1304,36 @@ export default function VendixApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [flashActive, setFlashActive] = useState(false);
 
+  useEffect(() => {
+    if (currentRoute === 'splash') {
+      setProgress(0);
+      setIsExiting(false);
+      const interval = setInterval(() => {
+        setProgress((prevProgress) => {
+          if (prevProgress >= 100) {
+            clearInterval(interval);
+            setIsExiting(true);
+            setTimeout(() => {
+              setCurrentRoute('login');
+            }, 500); // exit transition: 500ms
+            return 100;
+          }
+          return prevProgress + 2.5; // 40 steps * 45ms = 1800ms
+        });
+      }, 45);
+      return () => clearInterval(interval);
+    }
+  }, [currentRoute]);
+
   // Cart state initialized to matches mockup items
   const [cart, setCart] = useState([
     { id: 1, name: 'Coca Cola 500 ml', price: 4.00, qty: 2, avatar: '🥤' },
     { id: 2, name: 'Inca Kola 500 ml', price: 4.50, qty: 1, avatar: '🥤' }
   ]);
 
-  // Handle simulated scan beep and random product addition
-  const handleScan = () => {
-    // 1. Play beep
+  // Handle simulated or real native camera scan
+  const handleScan = async () => {
+    // 1. Play beep audio
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
@@ -1051,14 +1349,37 @@ export default function VendixApp() {
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.12); 
     } catch (e) {
-      console.log('Audio API beep supported/allowed:', e);
+      console.log('Audio API beep error:', e);
     }
 
     // 2. Trigger scanner laser flash
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 250);
 
-    // 3. Add random product
+    // 3. Try to use real ML Kit Scanner
+    try {
+      const support = await BarcodeScanner.isSupported();
+      if (support && support.supported) {
+        const permission = await BarcodeScanner.requestPermissions();
+        if (permission.camera === 'granted' || permission.camera === 'limited') {
+          const result = await BarcodeScanner.scan();
+          if (result && result.barcodes && result.barcodes.length > 0) {
+            const scannedCode = result.barcodes[0].displayValue || result.barcodes[0].rawValue;
+            if (scannedCode) {
+              handleSearchAdd(scannedCode);
+              alert(`Código escaneado: ${scannedCode}`);
+              return;
+            }
+          }
+        } else {
+          alert('Permiso de cámara denegado. Se usará la simulación.');
+        }
+      }
+    } catch (err) {
+      console.warn('Native scanner not available or error occurred:', err);
+    }
+
+    // 4. Fallback: Simulation
     const randProd = products[Math.floor(Math.random() * products.length)];
     setCart(prevCart => {
       const existing = prevCart.find(item => item.name === randProd.name);
@@ -1076,6 +1397,7 @@ export default function VendixApp() {
         }];
       }
     });
+    alert(`[Simulación] Producto detectado: ${randProd.name}`);
   };
 
   // Add from catalog
@@ -1141,24 +1463,66 @@ export default function VendixApp() {
     setCart(prevCart => prevCart.filter(item => item.id !== id));
   };
 
+  const viewportBgColor = '#080808';
+
   return (
-    <div style={styles.deviceViewport} className="app-container">
-      {/* HEADER PRINCIPAL (Oculto en Login o en Venta Completa Escáner o Nuevo Producto) */}
-      {currentRoute !== 'login' && currentRoute !== 'scanner' && currentRoute !== 'new-product' && (
+    <div style={{ ...styles.deviceViewport, backgroundColor: viewportBgColor }} className="app-container">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes fadeInScale {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+        .app-container {
+          background-color: ${viewportBgColor} !important;
+          transition: background-color 0.5s ease;
+        }
+      `}} />
+      {/* HEADER PRINCIPAL (Oculto en Splash, Login o en Venta Completa Escáner o Nuevo Producto) */}
+      {currentRoute !== 'login' && currentRoute !== 'splash' && currentRoute !== 'scanner' && currentRoute !== 'new-product' && (
         <header style={styles.navbarTop} className="app-header">
           {/* 3 RAYITAS ARRIBA A LA IZQUIERDA */}
           <button style={styles.hamburgerBtn} onClick={() => setSidebarOpen(true)}>
              <Menu size={24} />
           </button>
-          <span style={styles.topBarLogoName}>Vendix</span>
-          <button style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => alert('No tienes notificaciones pendientes.')}>
-             <Bell size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 16.5 L6.5 13.5 V21 H3 V16.5 Z" fill="#00d26a" />
+              <path d="M8.5 11.5 L12 8.5 V21 H8.5 V11.5 Z" fill="#00d26a" />
+              <path d="M14 6.5 L17.5 3.5 V21 H14 V6.5 Z" fill="#00d26a" />
+              <path d="M2 18 L19.5 3" stroke="#00d26a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13.5 3 H19.5 V9" stroke="#00d26a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={styles.topBarLogoName}>Vendix</span>
+          </div>
+          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => alert('No tienes notificaciones pendientes.')}>
+             <Bell size={22} style={{ color: '#FFFFFF' }} />
+             <span style={{ position: 'absolute', top: '1px', right: '1px', width: '8px', height: '8px', backgroundColor: '#00d26a', borderRadius: '50%', border: '1.5px solid #080808' }}></span>
+          </div>
         </header>
       )}
 
       {/* SIDEBAR DRAWER PANEL */}
-      {currentRoute !== 'login' && (
+      {currentRoute !== 'login' && currentRoute !== 'splash' && (
         <>
           <div 
             style={{
@@ -1253,8 +1617,11 @@ export default function VendixApp() {
       <main style={{
         ...styles.appViewContainer,
         overflowY: currentRoute === 'dashboard' ? 'hidden' : 'auto',
-        paddingBottom: (currentRoute === 'dashboard' || currentRoute === 'login' || currentRoute === 'new-product') ? '0px' : '90px'
+        paddingBottom: (currentRoute === 'dashboard' || currentRoute === 'login' || currentRoute === 'new-product' || currentRoute === 'splash') ? '0px' : '90px'
       }}>
+        {currentRoute === 'splash' && (
+          <SplashScreen progress={progress} isExiting={isExiting} />
+        )}
         {currentRoute === 'login' && (
           <LoginScreen 
             email={email}
@@ -1267,7 +1634,7 @@ export default function VendixApp() {
             }} 
           />
         )}
-        {currentRoute === 'dashboard' && <DashboardScreen onMetaClick={() => setCurrentRoute('scanner')} />}
+        {currentRoute === 'dashboard' && <DashboardScreen onMetaClick={(route) => setCurrentRoute(route || 'scanner')} />}
         {currentRoute === 'products' && (
           <ProductosScreen 
             products={products}
@@ -1298,11 +1665,11 @@ export default function VendixApp() {
         )}
       </main>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR (Oculta en Login o Nuevo Producto) */}
-      {currentRoute !== 'login' && currentRoute !== 'new-product' && (
+      {/* BARRA DE NAVEGACIÓN INFERIOR (Oculta en Splash, Login o Nuevo Producto) */}
+      {currentRoute !== 'login' && currentRoute !== 'splash' && currentRoute !== 'new-product' && (
         <nav style={styles.bottomTabNavigation}>
           <button 
-            style={currentRoute === 'dashboard' ? styles.tabItemActive : styles.tabItem} 
+            style={currentRoute === 'dashboard' ? styles.tabItemActiveGreen : styles.tabItem} 
             onClick={() => setCurrentRoute('dashboard')}
           >
             <HomeIcon size={20} />
@@ -1310,7 +1677,7 @@ export default function VendixApp() {
           </button>
           
           <button 
-            style={currentRoute === 'products' ? styles.tabItemActive : styles.tabItem} 
+            style={currentRoute === 'products' ? styles.tabItemActiveGreen : styles.tabItem} 
             onClick={() => setCurrentRoute('products')}
           >
             <Package size={20} />
@@ -1318,31 +1685,27 @@ export default function VendixApp() {
           </button>
           
           {/* BOTÓN CENTRAL FLOTANTE NUEVA VENTA */}
-          <button style={styles.centerFloatingBtn} onClick={() => setCurrentRoute('scanner')}>
-            <Plus size={26} />
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '-14px', zIndex: 30 }}>
+            <button style={styles.centerFloatingBtn} onClick={() => setCurrentRoute('scanner')}>
+              <Plus size={26} />
+            </button>
+            <span style={{ fontSize: '10px', color: '#8E8E93', marginTop: '4px' }}>Nueva venta</span>
+          </div>
           
           <button 
-            style={currentRoute === 'sales' ? styles.tabItemActive : styles.tabItem} 
+            style={currentRoute === 'sales' ? styles.tabItemActiveGreen : styles.tabItem} 
             onClick={() => setCurrentRoute('sales')}
           >
             <Receipt size={20} />
             <span>Ventas</span>
           </button>
           
-          {/* BOTÓN DE ESCANEAR EN LA ESQUINA INFERIOR DERECHA */}
           <button 
-            style={currentRoute === 'scanner' ? styles.tabItemActiveGreen : styles.tabItem} 
-            onClick={() => {
-              if (currentRoute !== 'scanner') {
-                setCurrentRoute('scanner');
-              } else {
-                handleScan();
-              }
-            }}
+            style={styles.tabItem} 
+            onClick={() => alert('Más opciones próximamente.')}
           >
-            <Scan size={20} />
-            <span>Escanear</span>
+            <MoreHorizontal size={20} />
+            <span>Más</span>
           </button>
         </nav>
       )}
@@ -1405,14 +1768,14 @@ const styles = {
   paginationEllipsis: { color: '#48484A', padding: '0 4px' },
   
   // Login Styles
-  loginContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', minHeight: '85vh' },
-  brandHeader: { textAlign: 'center', marginBottom: '32px' },
+  loginContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', minHeight: '85vh', zIndex: 2 },
+  brandHeader: { textAlign: 'center', marginBottom: '32px', opacity: 0 },
   logoWrapper: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' },
   logoIcon: { fontSize: '36px' },
-  logoText: { fontSize: '32px', margin: 0, fontWeight: '800' },
+  logoText: { fontSize: '32px', margin: 0, fontWeight: '800', color: '#FFFFFF' },
   slogan: { color: '#00A859', margin: '6px 0 0 0', fontWeight: '500', letterSpacing: '1px', fontSize: '14px' },
-  loginCard: { backgroundColor: '#111111', border: '1px solid #222222', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '380px', boxSizing: 'border-box' },
-  cardTitle: { margin: '0 0 6px 0', fontSize: '24px', fontWeight: '700', textAlign: 'center' },
+  loginCard: { backgroundColor: '#111111', border: '1px solid #222222', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '380px', boxSizing: 'border-box', opacity: 0 },
+  cardTitle: { margin: '0 0 6px 0', fontSize: '24px', fontWeight: '700', textAlign: 'center', color: '#FFFFFF' },
   cardSubtitle: { color: '#8E8E93', margin: '0 0 24px 0', fontSize: '13px', textAlign: 'center' },
   inputGroup: { marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' },
   inputLabel: { color: '#00A859', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' },
@@ -1480,6 +1843,25 @@ const styles = {
   bottomTabNavigation: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#111111', borderTop: '1px solid #1C1C1E', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 20, paddingBottom: '5px' },
   tabItem: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#8E8E93', fontSize: '11px', cursor: 'pointer', width: '60px' },
   tabItemActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#FFFFFF', fontSize: '11px', cursor: 'pointer', width: '60px' },
-  tabItemActiveGreen: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#22B15B', fontSize: '11px', fontWeight: '600', cursor: 'pointer', width: '60px' },
-  centerFloatingBtn: { width: '52px', height: '52px', backgroundColor: '#00A859', borderRadius: '50%', border: 'none', color: '#FFFFFF', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '-24px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 168, 89, 0.4)' }
+  tabItemActiveGreen: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#00d26a', fontSize: '11px', fontWeight: '600', cursor: 'pointer', width: '60px' },
+  centerFloatingBtn: { width: '52px', height: '52px', backgroundColor: '#00A859', borderRadius: '50%', border: 'none', color: '#FFFFFF', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '-24px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 168, 89, 0.4)' },
+  
+  // Custom styles for new 3.jpeg dashboard
+  kpiCardCustom: { 
+    backgroundColor: '#111111', 
+    border: '1px solid #1C1C1E', 
+    borderRadius: '16px', 
+    padding: '14px 12px', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    justifyContent: 'space-between', 
+    minHeight: '92px', 
+    boxSizing: 'border-box' 
+  },
+  kpiTitleCustom: { fontSize: '11px', color: '#8E8E93', fontWeight: '500' },
+  kpiValueCustom: { fontSize: '18px', fontWeight: '700', color: '#FFFFFF', margin: '4px 0 0 0' },
+  alertRowCustom: { backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '16px', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' },
+  quickAccessCard: { flex: 1, minWidth: '55px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer' },
+  quickAccessIconWrapper: { backgroundColor: '#111111', border: '1px solid #1C1C1E', borderRadius: '14px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00d26a' },
+  quickAccessLabel: { fontSize: '10px', color: '#8E8E93', textAlign: 'center', fontWeight: '500' }
 };
