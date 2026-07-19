@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image 
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { 
   ShoppingCart, 
@@ -29,6 +30,9 @@ import {
   Plus
 } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
+import TutorialStep from '../components/TutorialStep';
+import { auth, db, isFirebaseConfigured } from '../config/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -36,7 +40,12 @@ export default function DashboardScreen({
   onMetaClick, 
   products, 
   salesHistory, 
-  onUpdateProductStock 
+  onUpdateProductStock,
+  loggedInUser,
+  selectedBranch,
+  setSelectedBranch,
+  branches,
+  setBranches
 }) {
   // Local UI Modal States
   const [branchModalVisible, setBranchModalVisible] = useState(false);
@@ -46,8 +55,64 @@ export default function DashboardScreen({
   const [metaModalVisible, setMetaModalVisible] = useState(false);
   
   // Branch & Filter states
-  const [selectedBranch, setSelectedBranch] = useState('Bodega San Martín');
+  const [newBranchInput, setNewBranchInput] = useState('');
   const [dateFilter, setDateFilter] = useState('Hoy'); // 'Hoy', 'Ayer', 'Esta semana'
+
+  const handleSelectBranch = async (branch) => {
+    setSelectedBranch(branch);
+    try {
+      await AsyncStorage.setItem('@vendix_selected_branch', branch);
+      if (isFirebaseConfigured && auth && auth.currentUser) {
+        const uid = auth.currentUser.uid;
+        await setDoc(doc(db, "users", uid, "settings", "branches"), {
+          selectedBranch: branch,
+          branches: branches
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setBranchModalVisible(false);
+  };
+
+  const handleAddNewBranch = async () => {
+    if (newBranchInput && newBranchInput.trim()) {
+      const name = newBranchInput.trim();
+      
+      if (branches.includes(name)) {
+        Alert.alert('Atención', 'Esta sucursal ya existe.');
+        return;
+      }
+
+      const updated = [...branches, name];
+      setBranches(updated);
+      setSelectedBranch(name);
+      setNewBranchInput('');
+      setBranchModalVisible(false);
+      try {
+        await AsyncStorage.setItem('@vendix_branches_list', JSON.stringify(updated));
+        await AsyncStorage.setItem('@vendix_selected_branch', name);
+        if (isFirebaseConfigured && auth && auth.currentUser) {
+          const uid = auth.currentUser.uid;
+          await setDoc(doc(db, "users", uid, "settings", "branches"), {
+            selectedBranch: name,
+            branches: updated
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      Alert.alert('Atención', 'Por favor ingresa un nombre válido.');
+    }
+  };
+
+  const getUserDisplayName = (email) => {
+    if (!email) return 'Juan'; // Fallback a Juan si no está definido
+    const parts = email.split('@');
+    const name = parts[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
   
   // Re-stock quantity states
   const [selectedProductToRestock, setSelectedProductToRestock] = useState(null);
@@ -116,7 +181,7 @@ export default function DashboardScreen({
     // Fallback seed curve to avoid flat empty lines when database is reset
     const allZero = totals.every(t => t === 0);
     if (allZero) {
-      return [120, 240, 480, 310, 890, 650, salesTotal || 150];
+      return [0, 0, 0, 0, 0, 0, 0];
     }
     return totals;
   };
@@ -182,7 +247,7 @@ export default function DashboardScreen({
       {/* 1. Greeting Row */}
       <View style={styles.greetingRow}>
         <View>
-          <Text style={styles.greetingTitle}>¡Bienvenido, Juan!</Text>
+          <Text style={styles.greetingTitle}>¡Bienvenido, {getUserDisplayName(loggedInUser)}!</Text>
           <TouchableOpacity 
             style={styles.branchSelector}
             onPress={() => setBranchModalVisible(true)}
@@ -204,63 +269,65 @@ export default function DashboardScreen({
       </View>
 
       {/* 2. Grid de KPIs */}
-      <View style={styles.kpiGrid}>
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <ShoppingCart size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Ventas {dateFilter.toLowerCase()}</Text>
+      <TutorialStep stepName="dashboard_view">
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <ShoppingCart size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Ventas {dateFilter.toLowerCase()}</Text>
+            </View>
+            <Text style={styles.kpiValue}>S/ {salesTotal.toFixed(2)}</Text>
+            <Text style={styles.kpiTrend}>↗ Procesado</Text>
           </View>
-          <Text style={styles.kpiValue}>S/ {salesTotal.toFixed(2)}</Text>
-          <Text style={styles.kpiTrend}>↗ Procesado</Text>
+
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <ShoppingBag size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Ganancias</Text>
+            </View>
+            <Text style={styles.kpiValue}>S/ {earningsTotal.toFixed(2)}</Text>
+            <Text style={styles.kpiTrend}>Est. (30%)</Text>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <Receipt size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Órdenes</Text>
+            </View>
+            <Text style={styles.kpiValue}>{ordersCount}</Text>
+            <Text style={styles.kpiTrend}>↗ Hoy</Text>
+          </View>
         </View>
 
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <ShoppingBag size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Ganancias</Text>
+        <View style={[styles.kpiGrid, { marginTop: 10 }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <Package size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Prod. Vend.</Text>
+            </View>
+            <Text style={styles.kpiValue}>{productsSold}</Text>
+            <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 2 }}>unidades vendidas</Text>
           </View>
-          <Text style={styles.kpiValue}>S/ {earningsTotal.toFixed(2)}</Text>
-          <Text style={styles.kpiTrend}>Est. (30%)</Text>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <Receipt size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Órdenes</Text>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <Package size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Stock total</Text>
+            </View>
+            <Text style={styles.kpiValue}>{totalStock}</Text>
+            <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 2 }}>en almacén</Text>
           </View>
-          <Text style={styles.kpiValue}>{ordersCount}</Text>
-          <Text style={styles.kpiTrend}>↗ Hoy</Text>
-        </View>
-      </View>
 
-      <View style={[styles.kpiGrid, { marginTop: 10 }]}>
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <Package size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Prod. Vend.</Text>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <Users size={14} color={THEME.colors.primary} />
+              <Text style={styles.kpiTitle}>Clientes</Text>
+            </View>
+            <Text style={styles.kpiValue}>{ordersCount + 2}</Text>
+            <Text style={styles.kpiTrend}>Estimados</Text>
           </View>
-          <Text style={styles.kpiValue}>{productsSold}</Text>
-          <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 2 }}>unidades vendidas</Text>
         </View>
-
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <Package size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Stock total</Text>
-          </View>
-          <Text style={styles.kpiValue}>{totalStock}</Text>
-          <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 2 }}>en almacén</Text>
-        </View>
-
-        <View style={styles.kpiCard}>
-          <View style={styles.kpiHeaderRow}>
-            <Users size={14} color={THEME.colors.primary} />
-            <Text style={styles.kpiTitle}>Clientes</Text>
-          </View>
-          <Text style={styles.kpiValue}>{ordersCount + 2}</Text>
-          <Text style={styles.kpiTrend}>Estimados</Text>
-        </View>
-      </View>
+      </TutorialStep>
 
       {/* 3. Gráfico de la semana */}
       <View style={{ marginTop: 24 }}>
@@ -438,22 +505,59 @@ export default function DashboardScreen({
           activeOpacity={1}
           onPress={() => setBranchModalVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            style={[styles.modalContent, { width: '85%', maxWidth: 340 }]}
+          >
             <Text style={styles.modalTitle}>Selecciona Sucursal</Text>
-            {['Bodega San Martín', 'Sucursal Pucallpa Central', 'Sucursal Pucallpa Norte'].map((branch) => (
+            {branches.map((branch) => (
               <TouchableOpacity 
                 key={branch}
                 style={styles.modalListItem}
-                onPress={() => {
-                  setSelectedBranch(branch);
-                  setBranchModalVisible(false);
-                }}
+                onPress={() => handleSelectBranch(branch)}
               >
                 <Text style={{ color: THEME.colors.textWhite, fontSize: 16 }}>{branch}</Text>
                 {selectedBranch === branch && <Check size={18} color={THEME.colors.primary} />}
               </TouchableOpacity>
             ))}
-          </View>
+
+            {/* Sección para agregar sucursal personalizada */}
+            <View style={{ borderTopWidth: 1, borderTopColor: THEME.colors.borderDark, paddingTop: 16, marginTop: 12, width: '100%' }}>
+              <Text style={{ color: THEME.colors.textGray, fontSize: 11, marginBottom: 8, fontWeight: '700', letterSpacing: 0.5 }}>AGREGAR SUCURSAL PERSONALIZADA</Text>
+              <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    backgroundColor: THEME.colors.inputBg,
+                    borderWidth: 1,
+                    borderColor: THEME.colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    height: 40,
+                    color: THEME.colors.textWhite,
+                    fontSize: 14
+                  }}
+                  placeholder="Nombre de sucursal..."
+                  placeholderTextColor={THEME.colors.textGray}
+                  value={newBranchInput}
+                  onChangeText={setNewBranchInput}
+                />
+                <TouchableOpacity 
+                  style={{
+                    backgroundColor: THEME.colors.primary,
+                    borderRadius: 10,
+                    paddingHorizontal: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: 40
+                  }}
+                  onPress={handleAddNewBranch}
+                >
+                  <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', fontSize: 13 }}>Agregar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 

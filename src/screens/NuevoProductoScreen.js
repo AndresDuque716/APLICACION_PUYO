@@ -59,7 +59,6 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
       [
         { text: 'Tomar Foto con Cámara', onPress: takePhoto },
         { text: 'Seleccionar de Galería', onPress: pickImageFromGallery },
-        { text: 'Ingresar dirección URL', onPress: enterImageUrl },
         { text: 'Cancelar', style: 'cancel' }
       ]
     );
@@ -119,18 +118,7 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
     }
   };
 
-  const enterImageUrl = () => {
-    Alert.prompt(
-      'Ingresar URL',
-      'Ingresa la URL de la imagen del producto:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Ok', onPress: (url) => { if (url && url.trim()) setImage(url.trim()); } }
-      ],
-      'plain-text',
-      image.startsWith('http') ? image : ''
-    );
-  };
+
 
   // Barcode scanning actions
   const handleBarcodeScanPress = async () => {
@@ -259,6 +247,22 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
               </View>
             )}
           </TouchableOpacity>
+
+          {/* URL de Imagen */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>URL DE LA IMAGEN (OPCIONAL)</Text>
+            <View style={styles.inputFieldContainer}>
+              <TextInput 
+                placeholder="https://ejemplo.com/imagen.jpg" 
+                placeholderTextColor={THEME.colors.textGray}
+                style={styles.inputFieldOnly} 
+                value={image} 
+                onChangeText={setImage}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+            </View>
+          </View>
 
           {/* Nombre */}
           <View style={styles.inputGroup}>

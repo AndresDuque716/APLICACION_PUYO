@@ -17,20 +17,64 @@ import * as WebBrowser from 'expo-web-browser';
 import { User, Lock, Eye, EyeOff, Check } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 
+import { auth, isFirebaseConfigured } from '../config/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+
 export default function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  const handleFormSubmit = () => {
+  const handleFormSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Datos requeridos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      onLoginSuccess();
-    }, 1000);
+
+    if (isFirebaseConfigured && auth) {
+      try {
+        if (isRegistering) {
+          // Firebase Register
+          const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          setIsLoading(false);
+          Alert.alert('Registro Exitoso', 'Tu negocio ha sido registrado en la nube. ¡Bienvenido a Vendix!');
+          onLoginSuccess(userCredential.user.email);
+        } else {
+          // Firebase Login
+          const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+          setIsLoading(false);
+          onLoginSuccess(userCredential.user.email);
+        }
+      } catch (error) {
+        setIsLoading(false);
+        console.error(error);
+        let errorMsg = 'Ocurrió un error. Intenta nuevamente.';
+        if (error.code === 'auth/email-already-in-use') {
+          errorMsg = 'Este correo ya está registrado.';
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+          errorMsg = 'Correo o contraseña incorrectos.';
+        } else if (error.code === 'auth/weak-password') {
+          errorMsg = 'La contraseña debe tener al menos 6 caracteres.';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMsg = 'Formato de correo no válido.';
+        }
+        Alert.alert('Error', errorMsg);
+      }
+    } else {
+      // Mock Login Fallback (For Demo / testing before keys are configured)
+      setTimeout(() => {
+        setIsLoading(false);
+        if (isRegistering) {
+          Alert.alert(
+            'Modo Demo', 
+            'Para registrar cuentas reales en la nube, configura las credenciales de Firebase en src/config/firebase.js.'
+          );
+        } else {
+          onLoginSuccess(email.trim() || 'demo@vendix.com');
+        }
+      }, 800);
+    }
   };
 
   const handleFacebookLogin = async () => {
@@ -38,7 +82,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
       setEmail('facebook.user@vendix.com');
       Alert.alert('Simulación Facebook', 'Redirigiendo a Facebook...');
       await WebBrowser.openBrowserAsync('https://www.facebook.com');
-      onLoginSuccess();
+      onLoginSuccess('facebook.user@vendix.com');
     } catch (err) {
       console.log(err);
     }
@@ -47,7 +91,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
   const handleGoogleLogin = async () => {
     setEmail('google.user@vendix.com');
     Alert.alert('Simulación Google', 'Vinculando con Google...');
-    setTimeout(() => onLoginSuccess(), 800);
+    setTimeout(() => onLoginSuccess('google.user@vendix.com'), 800);
   };
 
   return (
@@ -70,8 +114,12 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
         </View>
 
         <View style={styles.loginCard}>
-          <Text style={styles.cardTitle}>Bienvenido</Text>
-          <Text style={styles.cardSubtitle}>Ingresa tus credenciales para acceder a Vendix.</Text>
+          <Text style={styles.cardTitle}>{isRegistering ? 'Crear Cuenta' : 'Bienvenido'}</Text>
+          <Text style={styles.cardSubtitle}>
+            {isRegistering 
+              ? 'Registra tu negocio en Vendix para sincronizar tus datos en la nube.' 
+              : 'Ingresa tus credenciales para acceder a Vendix.'}
+          </Text>
           
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>USUARIO / CORREO</Text>
@@ -124,7 +172,13 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
           </View>
 
           <TouchableOpacity style={styles.btnPrimary} onPress={handleFormSubmit} disabled={isLoading}>
-            <Text style={styles.btnPrimaryText}>{isLoading ? 'Cargando...' : 'Iniciar Sesión'}</Text>
+            <Text style={styles.btnPrimaryText}>
+              {isLoading 
+                ? 'Procesando...' 
+                : isRegistering 
+                  ? 'Crear Negocio y Registrar' 
+                  : 'Iniciar Sesión'}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
@@ -159,9 +213,12 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
              <Text style={{ color: THEME.colors.textWhite, fontWeight: '500' }}>Modo Invitado</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => Alert.alert('Registro', 'Registro disponible pronto.')}>
+          <TouchableOpacity onPress={() => setIsRegistering(!isRegistering)}>
             <Text style={styles.registerText}>
-              ¿No tienes cuenta? <Text style={styles.linkTextHighlight}>Registra tu negocio aquí</Text>
+              {isRegistering ? '¿Ya tienes una cuenta? ' : '¿No tienes cuenta? '}
+              <Text style={styles.linkTextHighlight}>
+                {isRegistering ? 'Inicia sesión aquí' : 'Registra tu negocio aquí'}
+              </Text>
             </Text>
           </TouchableOpacity>
         </View>

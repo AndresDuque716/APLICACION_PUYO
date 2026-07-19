@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -31,6 +31,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, Camera } from 'expo-camera';
 import { THEME } from '../constants/theme';
+import TutorialStep from '../components/TutorialStep';
 
 export default function ProductosScreen({ 
   products = [], 
@@ -60,14 +61,44 @@ export default function ProductosScreen({
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
 
-  // Filter products by category and query
-  const filteredProducts = products.filter(p => {
-    const matchesCategory = categoriaActiva === 'Todos' || p.category === categoriaActiva;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.barcode.includes(searchQuery);
-    return matchesCategory && matchesSearch;
-  });
+  // Dynamic Pagination & Sorting states
+  const ITEMS_PER_PAGE = 6;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('name-asc'); // 'name-asc', 'price-asc', 'price-desc', 'stock-asc', 'stock-desc'
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+
+  // Reset to first page when filters or sorting options change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoriaActiva, searchQuery, sortBy]);
+
+  // Filter and Sort products dynamically
+  const getSortedAndFilteredProducts = () => {
+    const list = [...products].filter(p => {
+      const matchesCategory = categoriaActiva === 'Todos' || p.category === categoriaActiva;
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            p.barcode.includes(searchQuery);
+      return matchesCategory && matchesSearch;
+    });
+
+    if (sortBy === 'name-asc') {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'price-asc') {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-desc') {
+      list.sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'stock-asc') {
+      list.sort((a, b) => a.stock - b.stock);
+    } else if (sortBy === 'stock-desc') {
+      list.sort((a, b) => b.stock - a.stock);
+    }
+    return list;
+  };
+
+  const sortedAndFilteredProducts = getSortedAndFilteredProducts();
+  const totalPages = Math.ceil(sortedAndFilteredProducts.length / ITEMS_PER_PAGE) || 1;
+  const paginatedProducts = sortedAndFilteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Category counts builder dynamically
   const getCategoryCount = (catName) => {
@@ -84,6 +115,26 @@ export default function ProductosScreen({
     setEditStock(product.stock.toString());
     setEditBarcode(product.barcode);
     setEditImage(product.image);
+  };
+
+  // Quick direct delete action from row
+  const handleQuickDelete = (product) => {
+    Alert.alert(
+      'Eliminar Producto',
+      `¿Estás seguro de que deseas eliminar permanentemente "${product.name}" del catálogo?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive', 
+          onPress: () => {
+            const updated = products.filter(p => p.id !== product.id);
+            onUpdateProductsList(updated);
+            Alert.alert('Éxito', 'Producto eliminado.');
+          }
+        }
+      ]
+    );
   };
 
   const handleBarcodeGenerate = () => {
@@ -125,7 +176,6 @@ export default function ProductosScreen({
       [
         { text: 'Tomar Foto', onPress: takePhoto },
         { text: 'Seleccionar de Galería', onPress: pickImageFromGallery },
-        { text: 'Ingresar URL', onPress: enterImageUrl },
         { text: 'Cancelar', style: 'cancel' }
       ]
     );
@@ -173,18 +223,7 @@ export default function ProductosScreen({
     }
   };
 
-  const enterImageUrl = () => {
-    Alert.prompt(
-      'URL de la imagen',
-      'Ingresa la dirección web:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Ok', onPress: (url) => { if (url) setEditImage(url.trim()); } }
-      ],
-      'plain-text',
-      editImage.startsWith('http') ? editImage : ''
-    );
-  };
+
 
   // Delete product action
   const handleDeleteProduct = () => {
@@ -297,9 +336,11 @@ export default function ProductosScreen({
             <Text style={styles.pageTitleText}>Productos</Text>
             <Text style={styles.subtextHeader}>Total: {products.length} productos</Text>
           </View>
-          <TouchableOpacity style={styles.btnAñadirProducto} onPress={onNewProductClick}>
-            <Text style={{ color: THEME.colors.textWhite, fontWeight: 'bold', fontSize: 13 }}>+ Nuevo producto</Text>
-          </TouchableOpacity>
+          <TutorialStep stepName="new_product_btn">
+            <TouchableOpacity style={styles.btnAñadirProducto} onPress={onNewProductClick}>
+              <Text style={{ color: THEME.colors.textWhite, fontWeight: 'bold', fontSize: 13 }}>+ Nuevo producto</Text>
+            </TouchableOpacity>
+          </TutorialStep>
         </View>
 
         {/* Search */}
@@ -314,12 +355,12 @@ export default function ProductosScreen({
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.btnFiltroIcon} onPress={() => Alert.alert('Filtros', 'Filtros avanzados próximamente.')}>
+          <TouchableOpacity style={styles.btnFiltroIcon} onPress={() => setSortModalVisible(true)}>
             <SlidersHorizontal size={16} color={THEME.colors.textWhite} />
             <Text style={{ color: THEME.colors.textWhite, fontSize: 13 }}>Filtros</Text>
           </TouchableOpacity>
         </View>
-
+ 
         {/* Categories Carousel */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
           <ScrollView 
@@ -349,7 +390,7 @@ export default function ProductosScreen({
               </TouchableOpacity>
             ))}
           </ScrollView>
-
+ 
           {/* Plus button to add custom categories */}
           <TouchableOpacity 
             style={styles.btnAddCatCircle}
@@ -358,83 +399,129 @@ export default function ProductosScreen({
             <Plus size={16} color={THEME.colors.textWhite} />
           </TouchableOpacity>
         </View>
-
+ 
         {/* List Grid of Products */}
-        <View style={styles.productRowsListContainer}>
-          {filteredProducts.map((prod) => {
-            const isOutOfStock = prod.stock === 0;
-            return (
-              <View 
-                key={prod.id} 
-                style={[styles.productListItemRow, { opacity: isOutOfStock ? 0.65 : 1 }]}
-              >
-                <TouchableOpacity 
-                  activeOpacity={isOutOfStock ? 0.8 : 0.6}
-                  style={styles.productListLeftSection}
-                  onPress={() => {
-                    if (prod.stock > 0) {
-                      onAddProduct(prod);
-                      Alert.alert('Catálogo', `${prod.name} agregado a la venta.`);
-                    } else {
-                      Alert.alert('Alerta', 'Este producto no tiene stock disponible.');
-                    }
-                  }}
+        <TutorialStep stepName="products_view">
+          <View style={styles.productRowsListContainer}>
+            {paginatedProducts.map((prod) => {
+              const isOutOfStock = prod.stock === 0;
+              const isLowStock = prod.stock > 0 && prod.stock <= 5;
+              return (
+                <View 
+                  key={prod.id} 
+                  style={[styles.productListItemRow, { opacity: isOutOfStock ? 0.65 : 1 }]}
                 >
-                  <Image source={{ uri: prod.image }} style={styles.productRowThumbnailImage} />
-                  <View style={styles.productRowDetailsBlock}>
-                    <Text style={styles.productRowTitleName}>{prod.name}</Text>
-                    <View style={styles.productRowSubDetails}>
-                      <Text style={styles.productRowCategoryLabel}>{prod.category}</Text>
-                      <Text style={styles.productRowDivider}>|</Text>
-                      <Text style={styles.productRowBarcodeText}>Cod: {prod.barcode}</Text>
+                  <TouchableOpacity 
+                    activeOpacity={isOutOfStock ? 0.8 : 0.6}
+                    style={styles.productListLeftSection}
+                    onPress={() => {
+                      if (prod.stock > 0) {
+                        onAddProduct(prod);
+                        Alert.alert('Catálogo', `${prod.name} agregado a la venta.`);
+                      } else {
+                        Alert.alert('Alerta', 'Este producto no tiene stock disponible.');
+                      }
+                    }}
+                  >
+                    <Image source={{ uri: prod.image }} style={styles.productRowThumbnailImage} />
+                    <View style={styles.productRowDetailsBlock}>
+                      <Text style={styles.productRowTitleName}>{prod.name}</Text>
+                      <View style={styles.productRowSubDetails}>
+                        <Text style={styles.productRowCategoryLabel}>{prod.category}</Text>
+                        <Text style={styles.productRowDivider}>|</Text>
+                        <Text style={styles.productRowBarcodeText}>Cod: {prod.barcode}</Text>
+                        {isOutOfStock && (
+                          <Text style={[styles.stockBadge, { backgroundColor: 'rgba(255,59,48,0.15)', color: '#FF3B30' }]}>
+                            Agotado
+                          </Text>
+                        )}
+                        {isLowStock && (
+                          <Text style={[styles.stockBadge, { backgroundColor: 'rgba(255,149,0,0.15)', color: '#FF9500' }]}>
+                            Bajo Stock
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.productListRightSection}>
+                    <View style={styles.productRowStockBlock}>
+                      <Text style={styles.stockLabelTitle}>Stock</Text>
+                      <Text style={prod.stock <= 5 ? styles.stockValueAlertNumber : styles.stockValueNormalNumber}>
+                        {prod.stock}
+                      </Text>
+                    </View>
+                    <Text style={styles.productRowPriceValue}>S/ {prod.price.toFixed(2)}</Text>
+                    
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                      {/* Edit Pencil Icon button */}
+                      <TouchableOpacity 
+                        style={styles.btnEditProductRow} 
+                        onPress={() => handleOpenEdit(prod)}
+                      >
+                        <Pencil size={12} color={THEME.colors.textWhite} />
+                      </TouchableOpacity>
+                      
+                      {/* Quick Delete Trash button */}
+                      <TouchableOpacity 
+                        style={[styles.btnEditProductRow, { backgroundColor: 'rgba(255,59,48,0.12)', borderColor: 'rgba(255,59,48,0.2)', borderWidth: 1 }]} 
+                        onPress={() => handleQuickDelete(prod)}
+                      >
+                        <Trash2 size={12} color={THEME.colors.danger} />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </TouchableOpacity>
-                
-                <View style={styles.productListRightSection}>
-                  <View style={styles.productRowStockBlock}>
-                    <Text style={styles.stockLabelTitle}>Stock</Text>
-                    <Text style={prod.stock <= 5 ? styles.stockValueAlertNumber : styles.stockValueNormalNumber}>
-                      {prod.stock}
-                    </Text>
-                  </View>
-                  <Text style={styles.productRowPriceValue}>S/ {prod.price.toFixed(2)}</Text>
-                  
-                  {/* Edit Pencil Icon button */}
-                  <TouchableOpacity 
-                    style={styles.btnEditProductRow} 
-                    onPress={() => handleOpenEdit(prod)}
-                  >
-                    <Pencil size={14} color={THEME.colors.textWhite} />
-                  </TouchableOpacity>
                 </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Pagination Footer */}
-        <View style={styles.paginationFooterRow}>
-          <TouchableOpacity style={styles.arrowPaginationBtn} onPress={() => Alert.alert('Paginación', 'Anterior página')}>
-            <ChevronLeft size={16} color={THEME.colors.textWhite} />
-          </TouchableOpacity>
-          <View style={styles.pageNumberBtnActive}>
-            <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', fontSize: 13 }}>1</Text>
+              );
+            })}
+            {paginatedProducts.length === 0 && (
+              <Text style={{ color: THEME.colors.textGray, textAlign: 'center', marginVertical: 30 }}>
+                No hay productos en esta sección.
+              </Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.pageNumberBtn} onPress={() => Alert.alert('Paginación', 'Página 2')}>
-            <Text style={{ color: THEME.colors.textGray, fontWeight: '600', fontSize: 13 }}>2</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pageNumberBtn} onPress={() => Alert.alert('Paginación', 'Página 3')}>
-            <Text style={{ color: THEME.colors.textGray, fontWeight: '600', fontSize: 13 }}>3</Text>
-          </TouchableOpacity>
-          <Text style={styles.paginationEllipsis}>...</Text>
-          <TouchableOpacity style={styles.pageNumberBtn} onPress={() => Alert.alert('Paginación', 'Última página')}>
-            <Text style={{ color: THEME.colors.textGray, fontWeight: '600', fontSize: 13 }}>8</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.arrowPaginationBtn} onPress={() => Alert.alert('Paginación', 'Siguiente página')}>
-            <ChevronRight size={16} color={THEME.colors.textWhite} />
-          </TouchableOpacity>
-        </View>
+        </TutorialStep>
+ 
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <View style={styles.paginationFooterRow}>
+            <TouchableOpacity 
+              style={[styles.arrowPaginationBtn, currentPage === 1 && { opacity: 0.4 }]} 
+              disabled={currentPage === 1}
+              onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              <ChevronLeft size={16} color={THEME.colors.textWhite} />
+            </TouchableOpacity>
+            
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const pageNum = idx + 1;
+              const isActive = currentPage === pageNum;
+              return (
+                <TouchableOpacity 
+                  key={pageNum}
+                  style={isActive ? styles.pageNumberBtnActive : styles.pageNumberBtn} 
+                  onPress={() => setCurrentPage(pageNum)}
+                >
+                  <Text style={{ 
+                    color: isActive ? THEME.colors.textWhite : THEME.colors.textGray, 
+                    fontWeight: isActive ? '700' : '600', 
+                    fontSize: 13 
+                  }}>
+                    {pageNum}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            
+            <TouchableOpacity 
+              style={[styles.arrowPaginationBtn, currentPage === totalPages && { opacity: 0.4 }]} 
+              disabled={currentPage === totalPages}
+              onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            >
+              <ChevronRight size={16} color={THEME.colors.textWhite} />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* MODAL: ADD CUSTOM CATEGORY */}
@@ -481,6 +568,58 @@ export default function ProductosScreen({
         </TouchableOpacity>
       </Modal>
 
+      {/* MODAL: SORT & FILTER OPTIONS */}
+      <Modal
+        visible={sortModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSortModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1}
+          onPress={() => setSortModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { maxWidth: 300 }]}>
+            <Text style={styles.modalTitle}>Filtrar y Ordenar</Text>
+            
+            <Text style={{ color: THEME.colors.textGray, fontSize: 11, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>ORDENAR POR</Text>
+            
+            {[
+              { label: '🔤 Nombre (A - Z)', value: 'name-asc' },
+              { label: '💵 Menor Precio primero', value: 'price-asc' },
+              { label: '💰 Mayor Precio primero', value: 'price-desc' },
+              { label: '📉 Menor Stock primero', value: 'stock-asc' },
+              { label: '📈 Mayor Stock primero', value: 'stock-desc' }
+            ].map((option) => {
+              const isSelected = sortBy === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.modalListItem}
+                  onPress={() => {
+                    setSortBy(option.value);
+                    setSortModalVisible(false);
+                  }}
+                >
+                  <Text style={{ color: isSelected ? THEME.colors.primary : THEME.colors.textWhite, fontSize: 15, fontWeight: isSelected ? '700' : '500' }}>
+                    {option.label}
+                  </Text>
+                  {isSelected && <Check size={16} color={THEME.colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity 
+              style={[styles.modalBtn, { width: '100%', marginTop: 15, backgroundColor: 'transparent', borderWidth: 1, borderColor: THEME.colors.borderDark }]} 
+              onPress={() => setSortModalVisible(false)}
+            >
+              <Text style={{ color: THEME.colors.textGray, fontWeight: '600', textAlign: 'center' }}>Cerrar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* MODAL: EDIT PRODUCT DETAILS */}
       <Modal
         visible={editingProduct !== null}
@@ -520,6 +659,22 @@ export default function ProductosScreen({
                   </View>
                 )}
               </TouchableOpacity>
+
+              {/* URL de Imagen */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>URL DE LA IMAGEN (OPCIONAL)</Text>
+                <View style={styles.inputFieldContainer}>
+                  <TextInput 
+                    placeholder="https://ejemplo.com/imagen.jpg" 
+                    placeholderTextColor={THEME.colors.textGray}
+                    style={styles.inputFieldOnly} 
+                    value={editImage} 
+                    onChangeText={setEditImage}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                </View>
+              </View>
 
               <View style={{ gap: 16, marginTop: 20 }}>
                 {/* Nombre */}
@@ -1126,5 +1281,14 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
+  },
+  stockBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+    textTransform: 'uppercase',
   },
 });

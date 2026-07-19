@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Search, Camera as CameraIcon, Minus, Plus, Trash2, ChevronDown, Check } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
+import TutorialStep from '../components/TutorialStep';
 
 export default function NuevaVentaScreen({ 
   products = [],
@@ -59,20 +60,22 @@ export default function NuevaVentaScreen({
       <Text style={styles.pageTitleText}>Nueva venta</Text>
       
       {/* Principal Scanner Trigger */}
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        style={styles.mainScannerCard} 
-        onPress={onScanClick}
-      >
-        {flashActive && <View style={styles.flashOverlay} />}
+      <TutorialStep stepName="new_sale_view">
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          style={styles.mainScannerCard} 
+          onPress={onScanClick}
+        >
+          {flashActive && <View style={styles.flashOverlay} />}
 
-        <Text style={styles.scannerHeaderTitle}>Escanear producto</Text>
-        <Text style={styles.scannerHeaderSub}>Presiona aquí para usar la cámara o simular escaneo</Text>
-        <View style={styles.scannerFrameTarget}>
-          <View style={styles.scannerLaser} />
-          <CameraIcon size={32} color={THEME.colors.textWhite} />
-        </View>
-      </TouchableOpacity>
+          <Text style={styles.scannerHeaderTitle}>Escanear producto</Text>
+          <Text style={styles.scannerHeaderSub}>Presiona aquí para usar la cámara o simular escaneo</Text>
+          <View style={styles.scannerFrameTarget}>
+            <View style={styles.scannerLaser} />
+            <CameraIcon size={32} color={THEME.colors.textWhite} />
+          </View>
+        </TouchableOpacity>
+      </TutorialStep>
 
       {/* Input de Búsqueda Manual */}
       <View style={{ position: 'relative', zIndex: 10 }}>

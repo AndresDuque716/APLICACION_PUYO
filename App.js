@@ -9,7 +9,8 @@ import {
   Alert, 
   Platform,
   Vibration,
-  Dimensions
+  Dimensions,
+  ScrollView
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
@@ -39,22 +40,56 @@ import NuevoProductoScreen from './src/screens/NuevoProductoScreen';
 import SalesHistoryScreen from './src/screens/SalesHistoryScreen';
 import NuevaVentaScreen from './src/screens/NuevaVentaScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
+import { TutorialProvider, useTutorial } from './src/components/TutorialProvider';
+import TutorialStep from './src/components/TutorialStep';
+import TutorialOverlay from './src/components/TutorialOverlay';
+import { auth, db, isFirebaseConfigured } from './src/config/firebase';
+import { 
+  collection, 
+  getDocs, 
+  setDoc, 
+  doc, 
+  deleteDoc, 
+  getDoc 
+} from 'firebase/firestore';
 
 export default function VendixApp() {
   const [currentRoute, setCurrentRoute] = useState('splash'); // 'splash', 'login', 'dashboard', 'products', 'new-product', 'sales', 'scanner', 'reports'
+  const [loggedInUser, setLoggedInUser] = useState('');
+
+  return (
+    <TutorialProvider 
+      currentRoute={currentRoute} 
+      setCurrentRoute={setCurrentRoute} 
+      loggedInUser={loggedInUser}
+    >
+      <VendixAppContent 
+        currentRoute={currentRoute}
+        setCurrentRoute={setCurrentRoute}
+        loggedInUser={loggedInUser}
+        setLoggedInUser={setLoggedInUser}
+      />
+    </TutorialProvider>
+  );
+}
+
+function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLoggedInUser }) {
+  const { resetTutorial } = useTutorial();
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   
   // Database States
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
-  const [salesHistory, setSalesHistory] = useState(INITIAL_SALES);
+  const [products, setProducts] = useState([]);
+  const [salesHistory, setSalesHistory] = useState([]);
   const [categories, setCategories] = useState(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
   const [cart, setCart] = useState([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loggedInUser, setLoggedInUser] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [flashActive, setFlashActive] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState('Mi Sucursal');
+  const [branches, setBranches] = useState(['Mi Sucursal']);
+  const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
 
   // Camera permissions states
   const [cameraScannerVisible, setCameraScannerVisible] = useState(false);
@@ -67,22 +102,98 @@ export default function VendixApp() {
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
   const [lastScannedTimestamp, setLastScannedTimestamp] = useState(0);
 
+  // Dynamic Real-time Notifications list
+  const getNotificationsList = () => {
+    if (!Array.isArray(products) || !Array.isArray(salesHistory)) {
+      return [];
+    }
+    const list = [];
+    
+    // 1. Out of stock alerts
+    const outOfStock = products.filter(p => p && typeof p.stock === 'number' && p.stock === 0);
+    outOfStock.forEach(p => {
+      list.push({
+        id: `out-stock-${p.id}`,
+        type: 'danger',
+        icon: '❌',
+        title: 'Producto Agotado',
+        message: `El producto "${p.name}" se ha quedado sin stock. Reabastécelo.`,
+        time: 'Ahora'
+      });
+    });
+
+    // 2. Low stock alerts
+    const lowStock = products.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5);
+    lowStock.forEach(p => {
+      list.push({
+        id: `low-stock-${p.id}`,
+        type: 'warning',
+        icon: '⚠️',
+        title: 'Stock Crítico',
+        message: `Quedan pocas unidades de "${p.name}" (${p.stock} restante).`,
+        time: 'Ahora'
+      });
+    });
+
+    // 3. Daily target achieved
+    const todaySales = salesHistory.filter(s => 
+      s && typeof s.time === 'string' && (s.time.includes('min') || s.time.includes('hora') || s.time.includes('momento'))
+    );
+    const totalToday = todaySales.reduce((sum, s) => sum + (s.total || 0), 0);
+    const DAILY_TARGET = 1500.00;
+    if (totalToday >= DAILY_TARGET) {
+      list.push({
+        id: 'target-achieved',
+        type: 'success',
+        icon: '🏆',
+        title: 'Meta Diaria Alcanzada',
+        message: `¡Felicitaciones! Se alcanzó la meta con S/ ${totalToday.toFixed(2)} vendidos hoy.`,
+        time: 'Hoy'
+      });
+    }
+
+    // 4. Latest transactions
+    if (salesHistory.length > 0 && salesHistory[0]) {
+      const latestSale = salesHistory[0];
+      list.push({
+        id: `sale-${latestSale.id}`,
+        type: 'info',
+        icon: '✅',
+        title: 'Venta Registrada',
+        message: `Se procesó la venta ${latestSale.id} por un total de S/ ${typeof latestSale.total === 'number' ? latestSale.total.toFixed(2) : '0.00'}.`,
+        time: latestSale.time || 'Ahora'
+      });
+    }
+
+    return list;
+  };
+
   // 1. Initial Load of Persisted Data
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        const storedProducts = await AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS);
-        if (storedProducts) {
-          setProducts(JSON.parse(storedProducts));
+        // Limpieza automática única para vaciar la app de datos demo anteriores
+        const mockCleared = await AsyncStorage.getItem('@vendix_mock_data_cleared');
+        if (mockCleared !== 'true') {
+          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+          await AsyncStorage.setItem('@vendix_mock_data_cleared', 'true');
+          setProducts([]);
+          setSalesHistory([]);
         } else {
-          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
-        }
+          const storedProducts = await AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS);
+          if (storedProducts) {
+            setProducts(JSON.parse(storedProducts));
+          } else {
+            await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+          }
 
-        const storedSalesHistory = await AsyncStorage.getItem(STORAGE_KEYS.SALES_HISTORY);
-        if (storedSalesHistory) {
-          setSalesHistory(JSON.parse(storedSalesHistory));
-        } else {
-          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(INITIAL_SALES));
+          const storedSalesHistory = await AsyncStorage.getItem(STORAGE_KEYS.SALES_HISTORY);
+          if (storedSalesHistory) {
+            setSalesHistory(JSON.parse(storedSalesHistory));
+          } else {
+            await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+          }
         }
 
         const storedCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
@@ -97,6 +208,20 @@ export default function VendixApp() {
           await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']));
         }
 
+        const storedSelected = await AsyncStorage.getItem('@vendix_selected_branch');
+        if (storedSelected) {
+          setSelectedBranch(storedSelected);
+        } else {
+          await AsyncStorage.setItem('@vendix_selected_branch', 'Mi Sucursal');
+        }
+
+        const storedList = await AsyncStorage.getItem('@vendix_branches_list');
+        if (storedList) {
+          setBranches(JSON.parse(storedList));
+        } else {
+          await AsyncStorage.setItem('@vendix_branches_list', JSON.stringify(['Mi Sucursal']));
+        }
+
         const storedUser = await AsyncStorage.getItem(STORAGE_KEYS.LOGGED_USER);
         if (storedUser) {
           setLoggedInUser(storedUser);
@@ -108,6 +233,75 @@ export default function VendixApp() {
     };
 
     loadPersistedData();
+  }, []);
+
+  // Sincronizar datos con Cloud Firestore
+  const syncDataWithCloud = async () => {
+    if (!isFirebaseConfigured || !auth || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    try {
+      // 1. Sincronizar productos
+      const productsColRef = collection(db, "users", uid, "products");
+      const productsSnapshot = await getDocs(productsColRef);
+      const cloudProducts = [];
+      productsSnapshot.forEach(doc => {
+        cloudProducts.push({ id: doc.id, ...doc.data() });
+      });
+      if (cloudProducts.length > 0) {
+        setProducts(cloudProducts);
+        await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cloudProducts));
+      }
+
+      // 2. Sincronizar historial de ventas
+      const salesColRef = collection(db, "users", uid, "sales");
+      const salesSnapshot = await getDocs(salesColRef);
+      const cloudSales = [];
+      salesSnapshot.forEach(doc => {
+        cloudSales.push({ id: doc.id, ...doc.data() });
+      });
+      cloudSales.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (cloudSales.length > 0) {
+        setSalesHistory(cloudSales);
+        await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(cloudSales));
+      }
+
+      // 3. Sincronizar configuraciones de sucursales
+      const branchDocRef = doc(db, "users", uid, "settings", "branches");
+      const branchSnap = await getDoc(branchDocRef);
+      if (branchSnap.exists()) {
+        const branchData = branchSnap.data();
+        if (branchData.selectedBranch) {
+          setSelectedBranch(branchData.selectedBranch);
+          await AsyncStorage.setItem('@vendix_selected_branch', branchData.selectedBranch);
+        }
+        if (branchData.branches) {
+          setBranches(branchData.branches);
+          await AsyncStorage.setItem('@vendix_branches_list', JSON.stringify(branchData.branches));
+        }
+      }
+      console.log("☁️ Vendix sincronizado con Cloud Firestore.");
+    } catch (err) {
+      console.error("⚠️ Error sincronizando con Firestore:", err);
+    }
+  };
+
+  // Escuchador de autenticación de Firebase
+  useEffect(() => {
+    if (isFirebaseConfigured && auth) {
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        if (user) {
+          setLoggedInUser(user.email);
+          setEmail(user.email);
+          AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, user.email).catch(console.error);
+          syncDataWithCloud();
+        } else {
+          setLoggedInUser('');
+          setEmail('');
+          AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER).catch(console.error);
+        }
+      });
+      return unsubscribe;
+    }
   }, []);
 
   // 2. Splash screen loading progress simulation
@@ -346,6 +540,21 @@ export default function VendixApp() {
       setSalesHistory(updatedSales);
       await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(updatedSales));
 
+      // Sync to cloud if configured
+      if (isFirebaseConfigured && auth && auth.currentUser) {
+        const uid = auth.currentUser.uid;
+        // Save sale
+        await setDoc(doc(db, "users", uid, "sales", newSale.id), newSale);
+        
+        // Update changed products in cloud
+        for (const prod of updatedProducts) {
+          const isCartItem = cart.some(item => item.name === prod.name);
+          if (isCartItem) {
+            await setDoc(doc(db, "users", uid, "products", prod.id), prod);
+          }
+        }
+      }
+
       // 3. Clear cart
       setCart([]);
       await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
@@ -373,6 +582,14 @@ export default function VendixApp() {
       });
       setProducts(updatedProducts);
       await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+
+      if (isFirebaseConfigured && auth && auth.currentUser) {
+        const uid = auth.currentUser.uid;
+        const prod = updatedProducts.find(p => p.id === prodId);
+        if (prod) {
+          await setDoc(doc(db, "users", uid, "products", prod.id), prod);
+        }
+      }
     } catch (err) {
       console.error('Error updating stock:', err);
     }
@@ -382,6 +599,29 @@ export default function VendixApp() {
     try {
       setProducts(updatedList);
       await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedList));
+
+      if (isFirebaseConfigured && auth && auth.currentUser) {
+        const uid = auth.currentUser.uid;
+        
+        // Get existing products in Cloud to check for deletions
+        const productsColRef = collection(db, "users", uid, "products");
+        const productsSnapshot = await getDocs(productsColRef);
+        const currentCloudIds = [];
+        productsSnapshot.forEach(doc => currentCloudIds.push(doc.id));
+        
+        // Write all current products to cloud
+        for (const prod of updatedList) {
+          await setDoc(doc(db, "users", uid, "products", prod.id), prod);
+        }
+
+        // Delete deleted products in cloud
+        const updatedListIds = updatedList.map(p => p.id);
+        for (const cloudId of currentCloudIds) {
+          if (!updatedListIds.includes(cloudId)) {
+            await deleteDoc(doc(db, "users", uid, "products", cloudId));
+          }
+        }
+      }
     } catch (err) {
       console.error('Error updating products list:', err);
     }
@@ -398,14 +638,21 @@ export default function VendixApp() {
   };
 
   // Auth actions
-  const handleLoginSuccess = async () => {
-    const userMail = email || 'duque@gmail.com';
-    setLoggedInUser(userMail);
-    await AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, userMail);
+  const handleLoginSuccess = async (userMail) => {
+    const finalMail = userMail || email || 'duque@gmail.com';
+    setLoggedInUser(finalMail);
+    await AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, finalMail);
     setCurrentRoute('dashboard');
   };
 
   const handleLogout = async () => {
+    if (isFirebaseConfigured && auth) {
+      try {
+        await auth.signOut();
+      } catch (err) {
+        console.error(err);
+      }
+    }
     setLoggedInUser('');
     setEmail('');
     setPassword('');
@@ -438,10 +685,10 @@ export default function VendixApp() {
             <Text style={styles.topBarLogoName}>Vendix</Text>
           </View>
           
-          <TouchableOpacity onPress={() => Alert.alert('Notificaciones', 'No tienes notificaciones pendientes.')}>
+          <TouchableOpacity onPress={() => setNotificationsModalVisible(true)}>
              <View style={{ position: 'relative' }}>
-               <Bell size={22} color={THEME.colors.textWhite} />
-               <View style={styles.notificationDot} />
+                <Bell size={22} color={THEME.colors.textWhite} />
+                {getNotificationsList().length > 0 && <View style={styles.notificationDot} />}
              </View>
           </TouchableOpacity>
         </View>
@@ -467,6 +714,11 @@ export default function VendixApp() {
             products={products}
             salesHistory={salesHistory}
             onUpdateProductStock={handleUpdateProductStock}
+            loggedInUser={loggedInUser}
+            selectedBranch={selectedBranch}
+            setSelectedBranch={setSelectedBranch}
+            branches={branches}
+            setBranches={setBranches}
           />
         )}
         {currentRoute === 'products' && (
@@ -513,74 +765,77 @@ export default function VendixApp() {
             onBack={() => setCurrentRoute('dashboard')}
             salesHistory={salesHistory}
             products={products}
+            loggedUser={loggedInUser}
           />
         )}
       </View>
 
       {/* BARRA DE NAVEGACIÓN INFERIOR */}
       {currentRoute !== 'login' && currentRoute !== 'splash' && currentRoute !== 'new-product' && (
-        <View style={styles.bottomTabNavigation}>
-          <TouchableOpacity 
-            style={styles.tabItem} 
-            onPress={() => setCurrentRoute('dashboard')}
-          >
-            <HomeIcon size={20} color={currentRoute === 'dashboard' || currentRoute === 'reports' ? THEME.colors.primary : THEME.colors.textGray} />
-            <Text style={{ 
-              fontSize: 11, 
-              color: currentRoute === 'dashboard' || currentRoute === 'reports' ? THEME.colors.primary : THEME.colors.textGray,
-              fontWeight: currentRoute === 'dashboard' || currentRoute === 'reports' ? '600' : 'normal',
-              marginTop: 4 
-            }}>
-              Inicio
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.tabItem} 
-            onPress={() => setCurrentRoute('products')}
-          >
-            <Package size={20} color={currentRoute === 'products' ? THEME.colors.primary : THEME.colors.textGray} />
-            <Text style={{ 
-              fontSize: 11, 
-              color: currentRoute === 'products' ? THEME.colors.primary : THEME.colors.textGray,
-              fontWeight: currentRoute === 'products' ? '600' : 'normal',
-              marginTop: 4 
-            }}>
-              Productos
-            </Text>
-          </TouchableOpacity>
-          
-          {/* BOTÓN CENTRAL FLOTANTE NUEVA VENTA */}
-          <View style={{ alignItems: 'center', marginTop: -20 }}>
-            <TouchableOpacity style={styles.centerFloatingBtn} onPress={() => setCurrentRoute('scanner')}>
-              <Plus size={26} color={THEME.colors.textWhite} />
+        <TutorialStep stepName="bottom_tab_bar">
+          <View style={styles.bottomTabNavigation}>
+            <TouchableOpacity 
+              style={styles.tabItem} 
+              onPress={() => setCurrentRoute('dashboard')}
+            >
+              <HomeIcon size={20} color={currentRoute === 'dashboard' || currentRoute === 'reports' ? THEME.colors.primary : THEME.colors.textGray} />
+              <Text style={{ 
+                fontSize: 11, 
+                color: currentRoute === 'dashboard' || currentRoute === 'reports' ? THEME.colors.primary : THEME.colors.textGray,
+                fontWeight: currentRoute === 'dashboard' || currentRoute === 'reports' ? '600' : 'normal',
+                marginTop: 4 
+              }}>
+                Inicio
+              </Text>
             </TouchableOpacity>
-            <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 4 }}>Nueva venta</Text>
+            
+            <TouchableOpacity 
+              style={styles.tabItem} 
+              onPress={() => setCurrentRoute('products')}
+            >
+              <Package size={20} color={currentRoute === 'products' ? THEME.colors.primary : THEME.colors.textGray} />
+              <Text style={{ 
+                fontSize: 11, 
+                color: currentRoute === 'products' ? THEME.colors.primary : THEME.colors.textGray,
+                fontWeight: currentRoute === 'products' ? '600' : 'normal',
+                marginTop: 4 
+              }}>
+                Productos
+              </Text>
+            </TouchableOpacity>
+            
+            {/* BOTÓN CENTRAL FLOTANTE NUEVA VENTA */}
+            <View style={{ alignItems: 'center', marginTop: -20 }}>
+              <TouchableOpacity style={styles.centerFloatingBtn} onPress={() => setCurrentRoute('scanner')}>
+                <Plus size={26} color={THEME.colors.textWhite} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 10, color: THEME.colors.textGray, marginTop: 4 }}>Nueva venta</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.tabItem} 
+              onPress={() => setCurrentRoute('sales')}
+            >
+              <Receipt size={20} color={currentRoute === 'sales' ? THEME.colors.primary : THEME.colors.textGray} />
+              <Text style={{ 
+                fontSize: 11, 
+                color: currentRoute === 'sales' ? THEME.colors.primary : THEME.colors.textGray,
+                fontWeight: currentRoute === 'sales' ? '600' : 'normal',
+                marginTop: 4 
+              }}>
+                Ventas
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.tabItem} 
+              onPress={resetTutorial}
+            >
+              <MoreHorizontal size={20} color={THEME.colors.textGray} />
+              <Text style={{ fontSize: 11, color: THEME.colors.textGray, marginTop: 4 }}>Tutorial</Text>
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.tabItem} 
-            onPress={() => setCurrentRoute('sales')}
-          >
-            <Receipt size={20} color={currentRoute === 'sales' ? THEME.colors.primary : THEME.colors.textGray} />
-            <Text style={{ 
-              fontSize: 11, 
-              color: currentRoute === 'sales' ? THEME.colors.primary : THEME.colors.textGray,
-              fontWeight: currentRoute === 'sales' ? '600' : 'normal',
-              marginTop: 4 
-            }}>
-              Ventas
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.tabItem} 
-            onPress={() => Alert.alert('Más', 'Más opciones próximamente.')}
-          >
-            <MoreHorizontal size={20} color={THEME.colors.textGray} />
-            <Text style={{ fontSize: 11, color: THEME.colors.textGray, marginTop: 4 }}>Más</Text>
-          </TouchableOpacity>
-        </View>
+        </TutorialStep>
       )}
 
       {/* SIDEBAR DRAWER PANEL */}
@@ -604,8 +859,8 @@ export default function VendixApp() {
                   <Text style={{ fontSize: 20 }}>🏪</Text>
                 </View>
                 <View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: THEME.colors.textWhite }}>Vendix Pucallpa</Text>
-                  <Text style={{ fontSize: 11, color: THEME.colors.textGray }}>Sucursal Principal</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: THEME.colors.textWhite }}>Vendix App</Text>
+                  <Text style={{ fontSize: 11, color: THEME.colors.textGray }}>{selectedBranch}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setSidebarOpen(false)}>
@@ -618,17 +873,73 @@ export default function VendixApp() {
                 <Text style={styles.sidebarSectionTitle}>Mi Negocio</Text>
                 <TouchableOpacity 
                   style={styles.sidebarMenuBtnActive}
-                  onPress={() => { setSidebarOpen(false); Alert.alert('Sucursal', 'Sucursal Principal seleccionada.'); }}
+                  onPress={() => { setSidebarOpen(false); }}
                 >
-                  <Text style={{ color: THEME.colors.primaryDark, fontSize: 13.5, fontWeight: '600' }}>Sucursal Pucallpa</Text>
+                  <Text style={{ color: THEME.colors.primaryDark, fontSize: 13.5, fontWeight: '600' }}>{selectedBranch}</Text>
                   <ChevronRight size={14} color={THEME.colors.primaryDark} />
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.sidebarMenuBtn}
-                  onPress={() => { setSidebarOpen(false); Alert.alert('Configuraciones', 'Configuraciones de negocio abiertas.'); }}
+                  onPress={() => { 
+                    setSidebarOpen(false); 
+                    Alert.alert(
+                      'Configuraciones',
+                      'Selecciona una opción:',
+                      [
+                        {
+                          text: 'Ver tutorial nuevamente',
+                          onPress: () => {
+                            resetTutorial();
+                          }
+                        },
+                        {
+                          text: 'Restablecer base de datos (Vaciar)',
+                          onPress: () => {
+                            Alert.alert(
+                              'Confirmación',
+                              '¿Estás seguro de que deseas borrar todos los productos y ventas? Esta acción no se puede deshacer.',
+                              [
+                                { text: 'Cancelar', style: 'cancel' },
+                                { 
+                                  text: 'Borrar todo', 
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+                                      await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+                                      setProducts([]);
+                                      setSalesHistory([]);
+                                      Alert.alert('Éxito', 'La base de datos ha sido vaciada por completo.');
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }
+                                }
+                              ]
+                            );
+                          }
+                        },
+                        {
+                          text: 'Cancelar',
+                          style: 'cancel'
+                        }
+                      ]
+                    );
+                  }}
                 >
                   <Text style={{ color: THEME.colors.textWhite, fontSize: 13.5 }}>Configuraciones</Text>
+                  <ChevronRight size={14} color={THEME.colors.textGray} />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.sidebarMenuBtn}
+                  onPress={() => { 
+                    setSidebarOpen(false); 
+                    setCurrentRoute('reports'); 
+                  }}
+                >
+                  <Text style={{ color: THEME.colors.textWhite, fontSize: 13.5 }}>Reportes e Indicadores</Text>
                   <ChevronRight size={14} color={THEME.colors.textGray} />
                 </TouchableOpacity>
               </View>
@@ -758,6 +1069,79 @@ export default function VendixApp() {
           </View>
         </View>
       </Modal>
+      {/* MODAL: NOTIFICATION CENTER */}
+      <Modal
+        visible={notificationsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setNotificationsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: '90%', maxHeight: '80%', padding: 20 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
+              <Text style={styles.modalTitle}>Notificaciones</Text>
+              <TouchableOpacity onPress={() => setNotificationsModalVisible(false)}>
+                <X size={20} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ gap: 10 }}>
+              {getNotificationsList().length > 0 ? (
+                getNotificationsList().map((notif) => (
+                  <View 
+                    key={notif.id} 
+                    style={{ 
+                      flexDirection: 'row', 
+                      gap: 12, 
+                      backgroundColor: THEME.colors.inputBg, 
+                      borderWidth: 1, 
+                      borderColor: notif.type === 'danger' ? 'rgba(255,59,48,0.2)' : notif.type === 'warning' ? 'rgba(255,149,0,0.2)' : THEME.colors.border, 
+                      borderRadius: 14, 
+                      padding: 12,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <View style={{ 
+                      width: 36, 
+                      height: 36, 
+                      borderRadius: 18, 
+                      backgroundColor: notif.type === 'danger' ? 'rgba(255,59,48,0.1)' : notif.type === 'warning' ? 'rgba(255,149,0,0.1)' : 'rgba(0,210,106,0.1)', 
+                      justifyContent: 'center', 
+                      alignItems: 'center' 
+                    }}>
+                      <Text style={{ fontSize: 16 }}>{notif.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', fontSize: 13 }}>{notif.title}</Text>
+                        <Text style={{ color: THEME.colors.textGray, fontSize: 10 }}>{notif.time}</Text>
+                      </View>
+                      <Text style={{ color: THEME.colors.textGray, fontSize: 11.5, marginTop: 2, lineHeight: 16 }}>{notif.message}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <Text style={{ fontSize: 32, marginBottom: 12 }}>🔔</Text>
+                  <Text style={{ color: THEME.colors.textWhite, fontWeight: '600', fontSize: 14 }}>Sin notificaciones</Text>
+                  <Text style={{ color: THEME.colors.textGray, fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                    Tu negocio está al día. Las alertas de stock y metas aparecerán aquí.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.btnPrimaryAction, { width: '100%', marginTop: 15, paddingVertical: 12, backgroundColor: THEME.colors.primaryDark }]} 
+              onPress={() => setNotificationsModalVisible(false)}
+            >
+              <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', textAlign: 'center', fontSize: 14 }}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {currentRoute !== 'splash' && currentRoute !== 'login' && <TutorialOverlay />}
     </SafeAreaView>
   );
 }

@@ -1,0 +1,65 @@
+export const TUTORIAL_STEPS = [
+  {
+    id: 'welcome',
+    title: '👋 Bienvenido a Vendix',
+    description: 'Te enseñaremos rápidamente cómo administrar tu negocio utilizando Vendix.\n\nNo tardaremos más de un minuto.',
+    target: null,
+    route: 'dashboard',
+  },
+  {
+    id: 'dashboard',
+    title: '📊 Resumen del Negocio',
+    description: 'Aquí encontrarás un resumen completo de tu negocio.\n\nPodrás conocer cuánto has vendido, productos agotados, productos con poco stock y estadísticas importantes.',
+    target: 'dashboard_view',
+    route: 'dashboard',
+  },
+  {
+    id: 'products',
+    title: '📦 Catálogo de Productos',
+    description: 'Aquí podrás registrar todos los productos de tu tienda.\n\nTambién podrás editar precios, cambiar fotografías, actualizar el stock y eliminar productos.',
+    target: 'products_view',
+    route: 'products',
+  },
+  {
+    id: 'new_product',
+    title: '➕ Registrar Producto',
+    description: 'Desde aquí agregarás nuevos productos.\n\nPodrás escribir su nombre, precio, categoría, fotografía y código de barras.\n\nSi el producto no tiene código, Vendix podrá generar uno automáticamente.',
+    target: 'new_product_btn',
+    route: 'products',
+  },
+  {
+    id: 'new_sale',
+    title: '🛒 Realizar Nueva Venta',
+    description: 'Esta es la pantalla principal del Punto de Venta.\n\nPodrás vender productos utilizando:\n• búsqueda manual\n• código de barras\n• cámara del celular\n\nTambién podrás aplicar descuentos y cobrar mediante distintos métodos de pago.',
+    target: 'new_sale_view',
+    route: 'scanner',
+  },
+  {
+    id: 'sales_history',
+    title: '📜 Historial de Ventas',
+    description: 'Aquí podrás revisar todas las ventas realizadas anteriormente.\n\nPodrás consultar cuánto se vendió, el método de pago utilizado y los productos vendidos.',
+    target: 'sales_history_view',
+    route: 'sales',
+  },
+  {
+    id: 'reports',
+    title: '📈 Reportes e Indicadores',
+    description: 'Aquí encontrarás estadísticas del negocio.\n\nPodrás conocer:\n• Productos más vendidos\n• Ventas acumuladas\n• Métodos de pago\n• Promedio de ventas\n\nY generar reportes en PDF para compartirlos.',
+    target: 'reports_view',
+    route: 'reports',
+  },
+  {
+    id: 'navigation',
+    title: '📱 Barra de Navegación',
+    description: 'Desde esta barra podrás navegar rápidamente entre todas las funciones principales de Vendix.',
+    target: 'bottom_tab_bar',
+    route: 'dashboard',
+  },
+  {
+    id: 'final',
+    title: '🎉 ¡Felicidades!',
+    description: 'Ya conoces las funciones principales de Vendix.\n\nAhora puedes comenzar a administrar tu negocio.',
+    target: null,
+    route: 'dashboard',
+  }
+];
