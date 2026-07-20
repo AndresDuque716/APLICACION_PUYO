@@ -277,54 +277,74 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     }
   }, [currentRoute, loggedInUser]);
 
+  const getUserProductsKey = (userMail) => {
+    const safeUser = (userMail || 'guest').replace(/[^a-zA-Z0-9]/g, '_');
+    return `@vendix_products_${safeUser}`;
+  };
+
+  const getUserSalesKey = (userMail) => {
+    const safeUser = (userMail || 'guest').replace(/[^a-zA-Z0-9]/g, '_');
+    return `@vendix_sales_history_${safeUser}`;
+  };
+
+  const loadUserDataForAccount = async (accountMail) => {
+    if (!accountMail) return;
+    try {
+      // 1. Limpiar inmediatamente estados anteriores para que no se mezclen datos entre cuentas
+      setProducts([]);
+      setSalesHistory([]);
+      setCart([]);
+
+      const prodKey = getUserProductsKey(accountMail);
+      const salesKey = getUserSalesKey(accountMail);
+
+      // 2. Cargar almacenamiento local propio de esta cuenta
+      const localProds = await AsyncStorage.getItem(prodKey);
+      if (localProds) {
+        setProducts(JSON.parse(localProds));
+      }
+      const localSales = await AsyncStorage.getItem(salesKey);
+      if (localSales) {
+        setSalesHistory(JSON.parse(localSales));
+      }
+
+      // 3. Sincronizar con Firestore de esta cuenta
+      if (isFirebaseConfigured && db) {
+        const uid = (auth && auth.currentUser && auth.currentUser.uid) 
+          ? auth.currentUser.uid 
+          : accountMail.replace(/[^a-zA-Z0-9]/g, '_');
+
+        const productsColRef = collection(db, "users", uid, "products");
+        const productsSnapshot = await getDocs(productsColRef);
+        const cloudProducts = [];
+        productsSnapshot.forEach(docSnap => {
+          cloudProducts.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        setProducts(cloudProducts);
+        await AsyncStorage.setItem(prodKey, JSON.stringify(cloudProducts));
+
+        const salesColRef = collection(db, "users", uid, "sales");
+        const salesSnapshot = await getDocs(salesColRef);
+        const cloudSales = [];
+        salesSnapshot.forEach(docSnap => {
+          cloudSales.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        cloudSales.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        setSalesHistory(cloudSales);
+        await AsyncStorage.setItem(salesKey, JSON.stringify(cloudSales));
+        console.log(`☁️ Datos aislados y sincronizados correctamente para (${accountMail}).`);
+      }
+    } catch (err) {
+      console.error("Error cargando datos de cuenta aislada:", err);
+    }
+  };
+
   // Sincronizar datos con Cloud Firestore
   const syncDataWithCloud = async () => {
-    if (!isFirebaseConfigured || !auth || !auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    try {
-      // 1. Sincronizar productos
-      const productsColRef = collection(db, "users", uid, "products");
-      const productsSnapshot = await getDocs(productsColRef);
-      const cloudProducts = [];
-      productsSnapshot.forEach(doc => {
-        cloudProducts.push({ id: doc.id, ...doc.data() });
-      });
-      if (cloudProducts.length > 0) {
-        setProducts(cloudProducts);
-        await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cloudProducts));
-      }
-
-      // 2. Sincronizar historial de ventas
-      const salesColRef = collection(db, "users", uid, "sales");
-      const salesSnapshot = await getDocs(salesColRef);
-      const cloudSales = [];
-      salesSnapshot.forEach(doc => {
-        cloudSales.push({ id: doc.id, ...doc.data() });
-      });
-      cloudSales.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-      if (cloudSales.length > 0) {
-        setSalesHistory(cloudSales);
-        await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(cloudSales));
-      }
-
-      // 3. Sincronizar configuraciones de sucursales
-      const branchDocRef = doc(db, "users", uid, "settings", "branches");
-      const branchSnap = await getDoc(branchDocRef);
-      if (branchSnap.exists()) {
-        const branchData = branchSnap.data();
-        if (branchData.selectedBranch) {
-          setSelectedBranch(branchData.selectedBranch);
-          await AsyncStorage.setItem('@vendix_selected_branch', branchData.selectedBranch);
-        }
-        if (branchData.branches) {
-          setBranches(branchData.branches);
-          await AsyncStorage.setItem('@vendix_branches_list', JSON.stringify(branchData.branches));
-        }
-      }
-      console.log("☁️ Vendix sincronizado con Cloud Firestore.");
-    } catch (err) {
-      console.error("⚠️ Error sincronizando con Firestore:", err);
-    }
+    if (!loggedInUser) return;
+    await loadUserDataForAccount(loggedInUser);
   };
 
   // Escuchador de autenticación de Firebase
@@ -335,10 +355,13 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
           setLoggedInUser(user.email);
           setEmail(user.email);
           AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, user.email).catch(console.error);
-          syncDataWithCloud();
+          loadUserDataForAccount(user.email);
         } else {
           setLoggedInUser('');
           setEmail('');
+          setProducts([]);
+          setSalesHistory([]);
+          setCart([]);
           AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER).catch(console.error);
         }
       });
@@ -672,10 +695,11 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   const handleUpdateProductsList = async (updatedList) => {
     try {
       setProducts(updatedList);
-      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedList));
+      const prodKey = getUserProductsKey(loggedInUser);
+      await AsyncStorage.setItem(prodKey, JSON.stringify(updatedList));
 
-      if (isFirebaseConfigured && auth && auth.currentUser) {
-        const uid = auth.currentUser.uid;
+      if (isFirebaseConfigured && db) {
+        const uid = getActiveUid();
         
         // Get existing products in Cloud to check for deletions
         const productsColRef = collection(db, "users", uid, "products");
@@ -717,6 +741,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     const displayIdentity = userNickname ? `${userNickname} (${finalMail})` : finalMail;
     setLoggedInUser(displayIdentity);
     await AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, displayIdentity);
+    await loadUserDataForAccount(finalMail);
     setCurrentRoute('dashboard');
   };
 
@@ -731,6 +756,8 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     setLoggedInUser('');
     setEmail('');
     setPassword('');
+    setProducts([]);
+    setSalesHistory([]);
     setCart([]);
     await AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
     await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
