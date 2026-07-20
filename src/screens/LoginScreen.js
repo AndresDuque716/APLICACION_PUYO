@@ -423,7 +423,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
             </View>
 
             <Text style={styles.googleModalSubtitle}>
-              Ingresa o selecciona tu cuenta de correo electrónico de Google para ingresar a Vendix:
+              Ingresa tu cuenta de correo de Google para vincular tu negocio con Vendix:
             </Text>
 
             <View style={{ marginBottom: 16 }}>
@@ -433,7 +433,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
               <View style={styles.inputFieldContainer}>
                 <View style={styles.inputIcon}><User size={18} color={THEME.colors.textGray} /></View>
                 <TextInput 
-                  placeholder="tu.nombre@gmail.com" 
+                  placeholder="tu.correo@gmail.com" 
                   placeholderTextColor={THEME.colors.textGray}
                   style={styles.inputField} 
                   value={customGoogleEmail}
@@ -443,38 +443,6 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
                 />
               </View>
             </View>
-
-            <Text style={{ fontSize: 11, fontWeight: '700', color: THEME.colors.textGray, marginBottom: 8 }}>
-              CUENTAS SUGERIDAS:
-            </Text>
-
-            <TouchableOpacity 
-              style={styles.googleAccountCard}
-              onPress={() => handleConfirmGoogleLogin('andresduque716@gmail.com')}
-            >
-              <View style={styles.googleAvatarCircle}>
-                <Text style={{ fontSize: 16, color: '#fff', fontWeight: '700' }}>A</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: THEME.colors.textWhite, fontWeight: '600', fontSize: 13 }}>Andrés Duque</Text>
-                <Text style={{ color: THEME.colors.textGray, fontSize: 11 }}>andresduque716@gmail.com</Text>
-              </View>
-              <ArrowRight size={16} color={THEME.colors.primary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.googleAccountCard}
-              onPress={() => handleConfirmGoogleLogin('vendix.negocio@gmail.com')}
-            >
-              <View style={[styles.googleAvatarCircle, { backgroundColor: THEME.colors.primaryDark }]}>
-                <Text style={{ fontSize: 16, color: '#fff', fontWeight: '700' }}>V</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: THEME.colors.textWhite, fontWeight: '600', fontSize: 13 }}>Vendix Negocios</Text>
-                <Text style={{ color: THEME.colors.textGray, fontSize: 11 }}>vendix.negocio@gmail.com</Text>
-              </View>
-              <ArrowRight size={16} color={THEME.colors.primary} />
-            </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.btnPrimary, { marginTop: 16 }]} 
