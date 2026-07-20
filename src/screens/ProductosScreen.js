@@ -425,22 +425,30 @@ export default function ProductosScreen({
                   >
                     <Image source={{ uri: prod.image }} style={styles.productRowThumbnailImage} />
                     <View style={styles.productRowDetailsBlock}>
-                      <Text style={styles.productRowTitleName}>{prod.name}</Text>
+                      <Text style={styles.productRowTitleName} numberOfLines={1} ellipsisMode="tail">
+                        {prod.name}
+                      </Text>
                       <View style={styles.productRowSubDetails}>
                         <Text style={styles.productRowCategoryLabel}>{prod.category}</Text>
-                        <Text style={styles.productRowDivider}>|</Text>
-                        <Text style={styles.productRowBarcodeText}>Cod: {prod.barcode}</Text>
-                        {isOutOfStock && (
+                        <Text style={styles.productRowDivider}>•</Text>
+                        <Text style={styles.productRowBarcodeText} numberOfLines={1} ellipsisMode="tail">
+                          {prod.barcode ? `Cod: ${prod.barcode}` : 'Sin código'}
+                        </Text>
+                      </View>
+                      {isOutOfStock && (
+                        <View style={styles.badgeWrapper}>
                           <Text style={[styles.stockBadge, { backgroundColor: 'rgba(255,59,48,0.15)', color: '#FF3B30' }]}>
                             Agotado
                           </Text>
-                        )}
-                        {isLowStock && (
+                        </View>
+                      )}
+                      {isLowStock && (
+                        <View style={styles.badgeWrapper}>
                           <Text style={[styles.stockBadge, { backgroundColor: 'rgba(255,149,0,0.15)', color: '#FF9500' }]}>
-                            Bajo Stock
+                            Bajo Stock ({prod.stock})
                           </Text>
-                        )}
-                      </View>
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                   
@@ -987,31 +995,38 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.inputBg,
   },
   productRowDetailsBlock: {
-    gap: 4,
+    gap: 3,
     flex: 1,
+    justifyContent: 'center',
   },
   productRowTitleName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: THEME.colors.textWhite,
   },
   productRowSubDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    flexWrap: 'wrap',
+    gap: 4,
   },
   productRowCategoryLabel: {
-    color: THEME.colors.success,
-    fontWeight: '500',
-    fontSize: 12,
+    color: THEME.colors.primary,
+    fontWeight: '600',
+    fontSize: 11,
   },
   productRowDivider: {
-    color: '#3A3A3C',
-    fontSize: 12,
+    color: THEME.colors.textGray,
+    fontSize: 10,
   },
   productRowBarcodeText: {
     color: THEME.colors.textGray,
-    fontSize: 12,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  badgeWrapper: {
+    flexDirection: 'row',
+    marginTop: 2,
   },
   productListRightSection: {
     flexDirection: 'row',

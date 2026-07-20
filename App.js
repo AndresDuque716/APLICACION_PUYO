@@ -10,7 +10,8 @@ import {
   Platform,
   Vibration,
   Dimensions,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
@@ -44,6 +45,7 @@ import { TutorialProvider, useTutorial } from './src/components/TutorialProvider
 import TutorialStep from './src/components/TutorialStep';
 import TutorialOverlay from './src/components/TutorialOverlay';
 import { auth, db, isFirebaseConfigured } from './src/config/firebase';
+import { deleteUser } from 'firebase/auth';
 import { 
   collection, 
   getDocs, 
@@ -53,28 +55,61 @@ import {
   getDoc 
 } from 'firebase/firestore';
 
+import { logScreenView, logSaleAnalytics } from './src/config/analytics';
+
+import { StatusBar as RNStatusBar } from 'react-native';
+
+let SafeAreaProvider = ({ children }) => <View style={{ flex: 1 }}>{children}</View>;
+let useSafeAreaInsets = () => {
+  const statusBarHeight = Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0;
+  return {
+    top: statusBarHeight,
+    bottom: Platform.OS === 'ios' ? 15 : (Platform.OS === 'android' ? 12 : 0),
+    left: 0,
+    right: 0
+  };
+};
+
+try {
+  const SafeAreaContext = require('react-native-safe-area-context');
+  if (SafeAreaContext && SafeAreaContext.SafeAreaProvider) {
+    SafeAreaProvider = SafeAreaContext.SafeAreaProvider;
+    useSafeAreaInsets = SafeAreaContext.useSafeAreaInsets;
+  }
+} catch (e) {
+  console.log("Safe area context fallback activo");
+}
+
 export default function VendixApp() {
   const [currentRoute, setCurrentRoute] = useState('splash'); // 'splash', 'login', 'dashboard', 'products', 'new-product', 'sales', 'scanner', 'reports'
   const [loggedInUser, setLoggedInUser] = useState('');
 
   return (
-    <TutorialProvider 
-      currentRoute={currentRoute} 
-      setCurrentRoute={setCurrentRoute} 
-      loggedInUser={loggedInUser}
-    >
-      <VendixAppContent 
-        currentRoute={currentRoute}
-        setCurrentRoute={setCurrentRoute}
+    <SafeAreaProvider>
+      <TutorialProvider 
+        currentRoute={currentRoute} 
+        setCurrentRoute={setCurrentRoute} 
         loggedInUser={loggedInUser}
-        setLoggedInUser={setLoggedInUser}
-      />
-    </TutorialProvider>
+      >
+        <VendixAppContent 
+          currentRoute={currentRoute}
+          setCurrentRoute={setCurrentRoute}
+          loggedInUser={loggedInUser}
+          setLoggedInUser={setLoggedInUser}
+        />
+      </TutorialProvider>
+    </SafeAreaProvider>
   );
 }
 
 function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLoggedInUser }) {
+  const insets = useSafeAreaInsets();
   const { resetTutorial } = useTutorial();
+
+  // Insets dinámicos que se adaptan a Android (Xiaomi, Redmi, POCO, Samsung, Motorola, Pixel) e iOS
+  const dynamicBottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 15 : 10);
+  const dynamicTopInset = Math.max(insets.top, Platform.OS === 'android' ? 25 : 0);
+
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   
@@ -90,6 +125,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   const [selectedBranch, setSelectedBranch] = useState('Mi Sucursal');
   const [branches, setBranches] = useState(['Mi Sucursal']);
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Camera permissions states
   const [cameraScannerVisible, setCameraScannerVisible] = useState(false);
@@ -235,6 +271,12 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     loadPersistedData();
   }, []);
 
+  useEffect(() => {
+    if (currentRoute) {
+      logScreenView(currentRoute, loggedInUser);
+    }
+  }, [currentRoute, loggedInUser]);
+
   // Sincronizar datos con Cloud Firestore
   const syncDataWithCloud = async () => {
     if (!isFirebaseConfigured || !auth || !auth.currentUser) return;
@@ -337,37 +379,50 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   };
 
   const handleScanAction = async () => {
-    const { status } = await Camera.getCameraPermissionsAsync();
-    setHasCameraPermission(status === 'granted');
-
-    if (status === 'granted') {
-      setCameraScannerVisible(true);
-    } else if (status === 'undetermined') {
-      const requestResult = await Camera.requestCameraPermissionsAsync();
-      setHasCameraPermission(requestResult.status === 'granted');
-      if (requestResult.status === 'granted') {
-        setCameraScannerVisible(true);
-      } else {
-        Alert.alert('Escaneo', 'Habilitando escaneo de simulación.');
+    try {
+      if (Platform.OS === 'web') {
         runMockScan();
+        return;
       }
-    } else {
-      setPermissionExplanationVisible(true);
+      const { status } = await Camera.getCameraPermissionsAsync();
+      setHasCameraPermission(status === 'granted');
+
+      if (status === 'granted') {
+        setCameraScannerVisible(true);
+      } else if (status === 'undetermined') {
+        const requestResult = await Camera.requestCameraPermissionsAsync();
+        setHasCameraPermission(requestResult.status === 'granted');
+        if (requestResult.status === 'granted') {
+          setCameraScannerVisible(true);
+        } else {
+          runMockScan();
+        }
+      } else {
+        setPermissionExplanationVisible(true);
+      }
+    } catch (err) {
+      console.log('Camera permission check note:', err);
+      runMockScan();
     }
   };
 
   const handleRequestCameraPermission = async () => {
     setPermissionExplanationVisible(false);
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setHasCameraPermission(status === 'granted');
-    if (status === 'granted') {
-      setCameraScannerVisible(true);
-    } else {
-      Alert.alert(
-        'Permiso denegado', 
-        'No se pudo acceder a la cámara. Se usará el simulador.',
-        [{ text: 'Entendido', onPress: runMockScan }]
-      );
+    try {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(status === 'granted');
+      if (status === 'granted') {
+        setCameraScannerVisible(true);
+      } else {
+        Alert.alert(
+          'Permiso denegado', 
+          'No se pudo acceder a la cámara. Se activará la simulación de escaneo.',
+          [{ text: 'Entendido', onPress: () => runMockScan() }]
+        );
+      }
+    } catch (err) {
+      console.log('Request camera error:', err);
+      runMockScan();
     }
   };
 
@@ -540,18 +595,37 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       setSalesHistory(updatedSales);
       await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(updatedSales));
 
+      // Helper para obtener el UID activo
+      const getActiveUid = () => {
+        if (auth && auth.currentUser && auth.currentUser.uid) {
+          return auth.currentUser.uid;
+        }
+        if (loggedInUser) {
+          return loggedInUser.replace(/[^a-zA-Z0-9]/g, '_');
+        }
+        return 'vendix_user_main';
+      };
+
       // Sync to cloud if configured
-      if (isFirebaseConfigured && auth && auth.currentUser) {
-        const uid = auth.currentUser.uid;
-        // Save sale
-        await setDoc(doc(db, "users", uid, "sales", newSale.id), newSale);
-        
-        // Update changed products in cloud
-        for (const prod of updatedProducts) {
-          const isCartItem = cart.some(item => item.name === prod.name);
-          if (isCartItem) {
-            await setDoc(doc(db, "users", uid, "products", prod.id), prod);
+      if (isFirebaseConfigured && db) {
+        try {
+          const uid = getActiveUid();
+          console.log(`🔥 Sincronizando venta ${newSale.id} en Firestore para usuario (${uid})...`);
+          
+          // Save sale
+          await setDoc(doc(db, "users", uid, "sales", newSale.id), newSale);
+          
+          // Update changed products in cloud
+          for (const prod of updatedProducts) {
+            const isCartItem = cart.some(item => item.name === prod.name);
+            if (isCartItem) {
+              await setDoc(doc(db, "users", uid, "products", prod.id), prod);
+            }
           }
+          console.log("✅ ¡Venta e inventario registrados con éxito en Firebase Firestore!");
+          logSaleAnalytics(total, cart.reduce((sum, item) => sum + item.qty, 0), method);
+        } catch (cloudErr) {
+          console.error("⚠️ Error guardando en Firebase Firestore:", cloudErr);
         }
       }
 
@@ -638,10 +712,11 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   };
 
   // Auth actions
-  const handleLoginSuccess = async (userMail) => {
-    const finalMail = userMail || email || 'duque@gmail.com';
-    setLoggedInUser(finalMail);
-    await AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, finalMail);
+  const handleLoginSuccess = async (userMail, userNickname) => {
+    const finalMail = userMail || email || 'invitado@vendix.com';
+    const displayIdentity = userNickname ? `${userNickname} (${finalMail})` : finalMail;
+    setLoggedInUser(displayIdentity);
+    await AsyncStorage.setItem(STORAGE_KEYS.LOGGED_USER, displayIdentity);
     setCurrentRoute('dashboard');
   };
 
@@ -663,12 +738,74 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     setCurrentRoute('login');
   };
 
-  return (
-    <SafeAreaView style={styles.deviceViewport}>
-      <StatusBar style="light" backgroundColor={THEME.colors.background} />
+  const handleDeleteAccount = () => {
+    setSidebarOpen(false);
+    Alert.alert(
+      '⚠️ Eliminar Cuenta Definitivamente',
+      'Esta acción eliminará tu cuenta de usuario y borrará permanentemente todos tus datos, productos e historial de ventas de forma irreversible.\n\n¿Estás completamente seguro?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Sí, Eliminar Cuenta', 
+          style: 'destructive',
+          onPress: () => {
+            performAccountDeletion();
+          }
+        }
+      ]
+    );
+  };
 
-      {/* HEADER PRINCIPAL */}
-      {currentRoute !== 'login' && currentRoute !== 'splash' && currentRoute !== 'new-product' && (
+  const performAccountDeletion = async () => {
+    setIsDeletingAccount(true);
+    try {
+      if (isFirebaseConfigured && auth && auth.currentUser) {
+        try {
+          await Promise.race([
+            deleteUser(auth.currentUser),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 3000))
+          ]);
+        } catch (fbErr) {
+          console.log('Firebase user delete note:', fbErr);
+          try { await auth.signOut(); } catch (e) {}
+        }
+      }
+
+      // Limpiar almacenamiento de forma segura
+      await AsyncStorage.removeItem(STORAGE_KEYS.PRODUCTS);
+      await AsyncStorage.removeItem(STORAGE_KEYS.SALES_HISTORY);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART);
+      await AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+      await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+
+      // Vaciar estados
+      setProducts([]);
+      setSalesHistory([]);
+      setCart([]);
+      setLoggedInUser('');
+      setEmail('');
+      setPassword('');
+
+      // Pausa para mostrar la animación de pantalla de carga
+      await new Promise(r => setTimeout(r, 1200));
+    } catch (err) {
+      console.error('Error al eliminar cuenta:', err);
+    } finally {
+      setIsDeletingAccount(false);
+      setCurrentRoute('login');
+      setTimeout(() => {
+        Alert.alert('Cuenta Eliminada', 'Tu cuenta y todos tus datos se borraron correctamente.');
+      }, 400);
+    }
+  };
+
+  return (
+    <SafeAreaView style={[styles.deviceViewport, { paddingTop: dynamicTopInset }]}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+
+      {/* TOP NAVIGATION BAR HEADER */}
+      {currentRoute !== 'splash' && currentRoute !== 'login' && currentRoute !== 'new-product' && (
         <View style={styles.navbarTop}>
           <TouchableOpacity style={styles.hamburgerBtn} onPress={() => setSidebarOpen(true)}>
              <Menu size={24} color={THEME.colors.textWhite} />
@@ -766,14 +903,29 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
             salesHistory={salesHistory}
             products={products}
             loggedUser={loggedInUser}
+            onResetSalesHistory={async () => {
+              try {
+                await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+                setSalesHistory([]);
+                Alert.alert('Ventas Reiniciadas', 'Las ventas acumuladas se han puesto en S/ 0.00 para iniciar tu nuevo reporte.');
+              } catch (e) {
+                console.error(e);
+              }
+            }}
           />
         )}
       </View>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR */}
+      {/* BARRA DE NAVEGACIÓN INFERIOR CON RESPETO DE SAFE AREA PARA BOTONES DE ANDROID */}
       {currentRoute !== 'login' && currentRoute !== 'splash' && currentRoute !== 'new-product' && (
         <TutorialStep stepName="bottom_tab_bar">
-          <View style={styles.bottomTabNavigation}>
+          <View style={[
+            styles.bottomTabNavigation,
+            {
+              paddingBottom: dynamicBottomInset,
+              height: 60 + dynamicBottomInset
+            }
+          ]}>
             <TouchableOpacity 
               style={styles.tabItem} 
               onPress={() => setCurrentRoute('dashboard')}
@@ -921,6 +1073,13 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
                           }
                         },
                         {
+                          text: '🗑️ Eliminar Cuenta Definitivamente',
+                          style: 'destructive',
+                          onPress: () => {
+                            handleDeleteAccount();
+                          }
+                        },
+                        {
                           text: 'Cancelar',
                           style: 'cancel'
                         }
@@ -944,7 +1103,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
                 </TouchableOpacity>
               </View>
 
-              <View style={{ marginTop: 'auto', gap: 12 }}>
+              <View style={{ marginTop: 'auto', gap: 10 }}>
                 <Text 
                   numberOfLines={1} 
                   style={{ fontSize: 12, color: THEME.colors.textGray, borderTopWidth: 1, borderTopColor: '#222', paddingTop: 12 }}
@@ -955,7 +1114,13 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
                   onPress={handleLogout}
                   style={styles.sidebarLogoutBtn}
                 >
-                  <Text style={{ color: THEME.colors.danger, fontSize: 13.5, fontWeight: '600', textAlign: 'center' }}>Cerrar Sesión</Text>
+                  <Text style={{ color: THEME.colors.textWhite, fontSize: 13.5, fontWeight: '600', textAlign: 'center' }}>Cerrar Sesión</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={handleDeleteAccount}
+                  style={[styles.sidebarLogoutBtn, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#ef4444' }]}
+                >
+                  <Text style={{ color: THEME.colors.danger, fontSize: 13, fontWeight: '600', textAlign: 'center' }}>🗑️ Eliminar Cuenta</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1141,6 +1306,46 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
         </View>
       </Modal>
 
+      {/* DELETING ACCOUNT LOADING MODAL */}
+      <Modal
+        visible={isDeletingAccount}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24
+        }}>
+          <View style={{
+            backgroundColor: THEME.colors.card,
+            borderRadius: 20,
+            padding: 30,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: THEME.colors.borderDark,
+            maxWidth: 320,
+            width: '100%',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.5,
+            shadowRadius: 15,
+            elevation: 10
+          }}>
+            <ActivityIndicator size="large" color={THEME.colors.danger} style={{ marginBottom: 20 }} />
+            <Text style={{ color: THEME.colors.textWhite, fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
+              Eliminando cuenta...
+            </Text>
+            <Text style={{ color: THEME.colors.textGray, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+              Borrando tu usuario, inventario y cerrando sesión de forma segura.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       {currentRoute !== 'splash' && currentRoute !== 'login' && <TutorialOverlay />}
     </SafeAreaView>
   );
@@ -1190,14 +1395,12 @@ const styles = StyleSheet.create({
 
   // Bottom Navigation Bar Styles
   bottomTabNavigation: {
-    height: 70,
     backgroundColor: THEME.colors.card,
     borderTopWidth: 1,
     borderTopColor: THEME.colors.border,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingBottom: Platform.OS === 'ios' ? 15 : 5,
   },
   tabItem: {
     alignItems: 'center',

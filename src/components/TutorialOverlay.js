@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   Dimensions, 
   Animated, 
-  Modal 
+  Modal,
+  ScrollView
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
@@ -35,12 +36,12 @@ export default function TutorialOverlay() {
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 100,
+          duration: 80,
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 250,
+          duration: 200,
           useNativeDriver: true,
         })
       ]).start();
@@ -53,7 +54,7 @@ export default function TutorialOverlay() {
       const targetProgress = activeStep === 0 ? 0 : activeStep / 8;
       Animated.timing(progressAnim, {
         toValue: targetProgress,
-        duration: 300,
+        duration: 250,
         useNativeDriver: false,
       }).start();
     }
@@ -61,7 +62,7 @@ export default function TutorialOverlay() {
 
   if (!isTutorialActive) return null;
 
-  const currentStepData = TUTORIAL_STEPS[activeStep];
+  const currentStepData = TUTORIAL_STEPS[activeStep] || TUTORIAL_STEPS[0];
   const targetId = currentStepData.target;
   const targetLayout = targetId ? layouts[targetId] : null;
 
@@ -71,45 +72,39 @@ export default function TutorialOverlay() {
     outputRange: ['0%', '100%'],
   });
 
-  // Determinar la ubicación de la tarjeta explicativa
+  // Determinar la ubicación segura de la tarjeta explicativa
   let cardStyle = styles.centeredCard;
   let hasCutout = false;
   let cutoutStyle = null;
 
-  if (targetLayout) {
+  if (targetLayout && targetLayout.width > 0 && targetLayout.height > 0) {
     const { x, y, width, height } = targetLayout;
     hasCutout = true;
+    cutoutStyle = { x, y, width, height };
 
-    // Cutout coordinates
-    cutoutStyle = {
-      x,
-      y,
-      width,
-      height
-    };
-
-    // Determina si poner la tarjeta explicativa arriba o abajo del elemento iluminado
     const placement = (y + height / 2) < (SCREEN_HEIGHT / 2) ? 'below' : 'above';
-    const margin = 18;
+    const margin = 14;
 
     if (placement === 'below') {
+      const calculatedTop = Math.min(y + height + margin, SCREEN_HEIGHT - 320);
       cardStyle = {
         position: 'absolute',
-        top: y + height + margin,
-        left: 20,
-        right: 20,
+        top: Math.max(50, calculatedTop),
+        left: 16,
+        right: 16,
       };
     } else {
+      const calculatedBottom = Math.min((SCREEN_HEIGHT - y) + margin, SCREEN_HEIGHT - 320);
       cardStyle = {
         position: 'absolute',
-        bottom: (SCREEN_HEIGHT - y) + margin,
-        left: 20,
-        right: 20,
+        bottom: Math.max(75, calculatedBottom),
+        left: 16,
+        right: 16,
       };
     }
   }
 
-  // Renderizar los 4 paneles de fondo oscuro para generar el recorte (cutout)
+  // Renderizar los 4 paneles oscuros de enfoque (cutout)
   const renderCutoutOverlay = () => {
     if (!hasCutout || !cutoutStyle) {
       return <View style={styles.fullDarkOverlay} />;
@@ -120,16 +115,16 @@ export default function TutorialOverlay() {
     return (
       <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
         {/* Panel superior */}
-        <View style={[styles.darkPanel, { top: 0, left: 0, right: 0, height: y }]} />
+        <View style={[styles.darkPanel, { top: 0, left: 0, right: 0, height: Math.max(0, y) }]} />
         {/* Panel inferior */}
         <View style={[styles.darkPanel, { top: y + height, left: 0, right: 0, bottom: 0 }]} />
         {/* Panel izquierdo */}
-        <View style={[styles.darkPanel, { top: y, left: 0, width: x, height: height }]} />
+        <View style={[styles.darkPanel, { top: y, left: 0, width: Math.max(0, x), height: height }]} />
         {/* Panel derecho */}
         <View style={[styles.darkPanel, { top: y, left: x + width, right: 0, height: height }]} />
 
-        {/* Borde verde luminoso alrededor del componente iluminado */}
-        <View style={[styles.glowingBorder, { top: y - 3, left: x - 3, width: width + 6, height: height + 6 }]} />
+        {/* Borde verde luminoso de enfoque */}
+        <View style={[styles.glowingBorder, { top: y - 4, left: x - 4, width: width + 8, height: height + 8 }]} />
       </View>
     );
   };
@@ -140,53 +135,57 @@ export default function TutorialOverlay() {
       transparent={true}
       animationType="fade"
       statusBarTranslucent={true}
+      onRequestClose={skipTutorial}
     >
       <View style={styles.container} pointerEvents="box-none">
-        {/* Capas oscuras recortadas */}
+        {/* Capas oscuras con foco */}
         {renderCutoutOverlay()}
 
         {/* Tarjeta Explicativa */}
         <Animated.View style={[styles.explanationCard, cardStyle, { opacity: fadeAnim }]}>
-          {/* Cabecera con indicador de pasos */}
+          {/* Cabecera con paso actual */}
           {activeStep > 0 && (
             <View style={styles.cardHeader}>
-              <Text style={styles.stepIndicatorText}>Paso {activeStep} de 8</Text>
+              <Text style={styles.stepIndicatorText}>PASO {activeStep} DE 8</Text>
               <View style={styles.progressBarTrack}>
                 <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
               </View>
             </View>
           )}
 
-          {/* Contenido principal */}
-          {activeStep === 8 ? (
-            // Pantalla final con animación
-            <View style={styles.successContainer}>
-              <View style={styles.successIconCircle}>
-                <Svg viewBox="0 0 24 24" width="36" height="36" fill="none">
-                  <Path 
-                    d="M20 6L9 17L4 12" 
-                    stroke={THEME.colors.primary} 
-                    strokeWidth="3.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-                </Svg>
+          {/* Contenido adaptable con ScrollView para evitar desbordamiento de texto */}
+          <ScrollView 
+            style={styles.scrollContent} 
+            contentContainerStyle={styles.scrollContentContainer} 
+            showsVerticalScrollIndicator={false}
+          >
+            {activeStep === 8 ? (
+              <View style={styles.successContainer}>
+                <View style={styles.successIconCircle}>
+                  <Svg viewBox="0 0 24 24" width="36" height="36" fill="none">
+                    <Path 
+                      d="M20 6L9 17L4 12" 
+                      stroke={THEME.colors.primary} 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                    />
+                  </Svg>
+                </View>
+                <Text style={styles.cardTitle}>{currentStepData.title}</Text>
+                <Text style={styles.cardDescription}>{currentStepData.description}</Text>
               </View>
-              <Text style={styles.cardTitle}>{currentStepData.title}</Text>
-              <Text style={styles.cardDescription}>{currentStepData.description}</Text>
-            </View>
-          ) : (
-            // Pantallas regulares
-            <View>
-              <Text style={styles.cardTitle}>{currentStepData.title}</Text>
-              <Text style={styles.cardDescription}>{currentStepData.description}</Text>
-            </View>
-          )}
+            ) : (
+              <View style={{ flexShrink: 1 }}>
+                <Text style={styles.cardTitle}>{currentStepData.title}</Text>
+                <Text style={styles.cardDescription}>{currentStepData.description}</Text>
+              </View>
+            )}
+          </ScrollView>
 
-          {/* Fila de Botones */}
+          {/* Botones de Acción */}
           <View style={styles.buttonsRow}>
             {activeStep === 0 ? (
-              // Botones para la pantalla de bienvenida
               <>
                 <TouchableOpacity style={styles.btnSecondary} onPress={skipTutorial}>
                   <Text style={styles.btnSecondaryText}>Saltar</Text>
@@ -197,17 +196,15 @@ export default function TutorialOverlay() {
                 </TouchableOpacity>
               </>
             ) : activeStep === 8 ? (
-              // Botón de la pantalla final
               <TouchableOpacity style={[styles.btnPrimary, { flex: 1, justifyContent: 'center' }]} onPress={goToNextStep}>
-                <Text style={styles.btnPrimaryText}>Comenzar a usar Vendix</Text>
+                <Text style={styles.btnPrimaryText}>🚀 Comenzar a usar Vendix</Text>
               </TouchableOpacity>
             ) : (
-              // Botones de pasos interactivos intermedios
               <>
                 <TouchableOpacity style={styles.btnSkipText} onPress={skipTutorial}>
                   <Text style={styles.btnSkipTextOnly}>Saltar</Text>
                 </TouchableOpacity>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
                   <TouchableOpacity style={styles.btnNavCircle} onPress={goToPrevStep}>
                     <ChevronLeft size={18} color={THEME.colors.textWhite} />
                   </TouchableOpacity>
@@ -233,11 +230,11 @@ const styles = StyleSheet.create({
   },
   fullDarkOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
   },
   darkPanel: {
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
   },
   glowingBorder: {
     position: 'absolute',
@@ -247,40 +244,41 @@ const styles = StyleSheet.create({
     shadowColor: '#00D26A',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
-    shadowRadius: 12,
+    shadowRadius: 10,
     elevation: 8,
   },
   centeredCard: {
-    width: SCREEN_WIDTH - 40,
-    maxWidth: 360,
+    width: '90%',
+    maxWidth: 380,
+    alignSelf: 'center',
   },
   explanationCard: {
     backgroundColor: THEME.colors.card,
-    borderWidth: 1,
-    borderColor: THEME.colors.borderDark,
-    borderRadius: 24,
-    padding: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 210, 106, 0.25)',
+    borderRadius: 22,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
-    shadowRadius: 15,
+    shadowRadius: 12,
     elevation: 10,
-    zIndex: 1000,
+    maxHeight: SCREEN_HEIGHT * 0.7,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   stepIndicatorText: {
     color: THEME.colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   progressBarTrack: {
-    width: 100,
+    width: 90,
     height: 4,
     backgroundColor: THEME.colors.borderDark,
     borderRadius: 2,
@@ -290,28 +288,38 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: THEME.colors.primary,
   },
+  scrollContent: {
+    maxHeight: 220,
+    marginBottom: 16,
+  },
+  scrollContentContainer: {
+    paddingVertical: 4,
+  },
   cardTitle: {
     color: THEME.colors.textWhite,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 8,
+    lineHeight: 24,
   },
   cardDescription: {
-    color: THEME.colors.textGray,
-    fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 24,
+    color: THEME.colors.textLightGray,
+    fontSize: 13,
+    lineHeight: 20,
   },
   buttonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
   btnPrimary: {
     backgroundColor: THEME.colors.success,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -319,49 +327,50 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     color: THEME.colors.textWhite,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   btnSecondary: {
     borderWidth: 1,
     borderColor: THEME.colors.borderDark,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
   },
   btnSecondaryText: {
     color: THEME.colors.textGray,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
   },
   btnSkipText: {
-    paddingVertical: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   btnSkipTextOnly: {
     color: THEME.colors.textGray,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   btnNavCircle: {
     backgroundColor: THEME.colors.borderDark,
-    borderRadius: 14,
-    width: 44,
-    height: 44,
+    borderRadius: 12,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },
   successContainer: {
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 6,
   },
   successIconCircle: {
     backgroundColor: 'rgba(0, 210, 106, 0.1)',
     borderWidth: 1.5,
     borderColor: 'rgba(0, 210, 106, 0.25)',
-    borderRadius: 36,
-    width: 68,
-    height: 68,
+    borderRadius: 30,
+    width: 60,
+    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
 });

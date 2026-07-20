@@ -13,16 +13,19 @@ import {
 } from './reportUtils';
 
 export function generateHtmlReport(salesHistory, products, loggedUser, branchName = "Mi Sucursal") {
-  const metrics = calculateSummaryMetrics(salesHistory, products);
-  const paymentBreakdown = calculatePaymentBreakdown(salesHistory);
-  const topProducts = calculateTopSellingProducts(salesHistory, products, 5);
-  const recommendations = generateRecommendations(salesHistory, products);
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+
+  const metrics = calculateSummaryMetrics(safeSales, safeProducts);
+  const paymentBreakdown = calculatePaymentBreakdown(safeSales);
+  const topProducts = calculateTopSellingProducts(safeSales, safeProducts, 5);
+  const recommendations = generateRecommendations(safeSales, safeProducts);
   
   // Obtener las últimas 10 ventas
-  const recentSales = salesHistory.slice(0, 10);
+  const recentSales = safeSales.slice(0, 10);
 
   // Listado de productos con stock bajo (crítico)
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 5);
+  const lowStockProducts = safeProducts.filter(p => p && p.stock > 0 && p.stock <= 5);
 
   const currentDate = new Date().toLocaleDateString('es-PE', {
     year: 'numeric', month: 'long', day: 'numeric'
@@ -36,7 +39,7 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Reporte de Ventas Vendix</title>
+      <title>Reporte Vendix</title>
       <style>
         body {
           font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -256,14 +259,14 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
       </div>
 
       <!-- Título de Reporte -->
-      <div class="report-title">Reporte General de Ventas</div>
+      <div class="report-title">Reporte General de Ventas e Inventario</div>
 
       <!-- Resumen General KPIs -->
       <div class="kpi-container">
         <div class="kpi-card">
           <div class="kpi-title">Total Vendido</div>
           <div class="kpi-value">S/ ${metrics.totalSalesVolume.toFixed(2)}</div>
-          <div class="kpi-sub">Ingresos brutos</div>
+          <div class="kpi-sub">Ingresos acumulados</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Ventas Totales</div>
@@ -281,6 +284,34 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
           <div class="kpi-sub">En catálogo</div>
         </div>
       </div>
+
+      <!-- Catálogo Completo de Productos e Inventario -->
+      <div class="section-title">Catálogo Completo de Productos Registrados</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Código / Barcode</th>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th style="text-align: center;">Stock</th>
+            <th style="text-align: right;">Precio Unitario</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${safeProducts.map(p => `
+            <tr>
+              <td><strong>${p.barcode || p.id}</strong></td>
+              <td>${p.avatar || '📦'} ${p.name}</td>
+              <td>${p.category || 'General'}</td>
+              <td style="text-align: center; font-weight: 700; color: ${p.stock === 0 ? '#dc3545' : p.stock <= 5 ? '#ffc107' : '#28a745'};">
+                ${p.stock} und.
+              </td>
+              <td style="text-align: right; font-weight: 700; color: #00A859;">S/ ${(p.price || 0).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+          ${safeProducts.length === 0 ? '<tr><td colspan="5" style="text-align: center;">No hay productos en el catálogo.</td></tr>' : ''}
+        </tbody>
+      </table>
 
       <!-- Productos Más Vendidos -->
       <div class="section-title">Top 5 Productos más Vendidos</div>
@@ -305,7 +336,7 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
               </tr>
             `;
           }).join('')}
-          ${topProducts.length === 0 ? '<tr><td colspan="4" style="text-align: center;">No hay registros de productos vendidos.</td></tr>' : ''}
+          ${topProducts.length === 0 ? '<tr><td colspan="4" style="text-align: center;">No hay registros de ventas para esta categoría.</td></tr>' : ''}
         </tbody>
       </table>
 
@@ -322,10 +353,10 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
       </div>
 
       <!-- Estado de Inventario -->
-      <div class="section-title">Estado de Inventario</div>
+      <div class="section-title">Resumen de Stock e Inventario</div>
       <div class="inventory-summary">
         <div class="inventory-item" style="border-right: 1px solid #dee2e6;">
-          <div class="inventory-val success">${products.filter(p => p.stock > 5).length}</div>
+          <div class="inventory-val success">${safeProducts.filter(p => p && p.stock > 5).length}</div>
           <div class="inventory-lbl">Productos Disponibles</div>
         </div>
         <div class="inventory-item" style="border-right: 1px solid #dee2e6;">

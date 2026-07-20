@@ -18,7 +18,6 @@ export default function TutorialStep({ stepName, children, style }) {
 
   useEffect(() => {
     if (isTutorialActive) {
-      // Agrega un pequeño retraso para asegurar que la pantalla haya cambiado y el renderizado finalice
       const timer = setTimeout(measureElement, 350);
       return () => clearTimeout(timer);
     }

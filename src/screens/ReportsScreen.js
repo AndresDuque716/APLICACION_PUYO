@@ -14,74 +14,108 @@ import Svg, { Rect, G, Text as SvgText } from 'react-native-svg';
 import { ChevronLeft, TrendingUp, DollarSign, Award, CreditCard } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
-import { generateAndSharePdfReport, sharePdfFile } from '../components/pdfGenerator';
+import { generateAndSharePdfReport, sharePdfFile, previewOrPrintPdf, deleteGeneratedPdfReport } from '../components/pdfGenerator';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function ReportsScreen({ onBack, salesHistory, products, loggedUser }) {
+export default function ReportsScreen({ onBack, salesHistory, products, loggedUser, onResetSalesHistory }) {
   const [pdfStatus, setPdfStatus] = useState('idle'); // 'idle' | 'generating' | 'success' | 'error'
   const [pdfMessage, setPdfMessage] = useState('');
   const [pdfUri, setPdfUri] = useState('');
+  const [pdfHtml, setPdfHtml] = useState('');
+
+  const safeSalesHistory = Array.isArray(salesHistory) ? salesHistory : [];
+  const safeProducts = Array.isArray(products) ? products : [];
 
   const handleGeneratePdf = () => {
-    generateAndSharePdfReport(salesHistory, products, loggedUser, {
+    generateAndSharePdfReport(safeSalesHistory, safeProducts, loggedUser, {
       onStart: () => {
         setPdfStatus('generating');
         setPdfUri('');
+        setPdfHtml('');
       },
       onUpdateStatus: (msg) => {
         setPdfMessage(msg);
       },
-      onSuccess: (uri) => {
+      onSuccess: ({ uri, htmlContent }) => {
         setPdfStatus('success');
-        setPdfUri(uri);
-        // Abre automáticamente el menú de compartir
-        sharePdfFile(uri);
+        setPdfUri(uri || '');
+        setPdfHtml(htmlContent || '');
+        if (uri) {
+          sharePdfFile(uri, htmlContent);
+        } else if (htmlContent) {
+          previewOrPrintPdf(htmlContent, uri);
+        }
       },
       onError: (err) => {
+        console.error("Error al generar el reporte:", err);
         setPdfStatus('error');
       }
     });
   };
+
+  const handleDeletePdf = () => {
+    Alert.alert(
+      '🗑️ Eliminar Reporte Generado',
+      '¿Deseas eliminar físicamente el archivo "Reporte_Vendix.pdf" de la memoria de tu dispositivo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Sí, Eliminar Reporte', 
+          style: 'destructive',
+          onPress: async () => {
+            await deleteGeneratedPdfReport(pdfUri);
+            setPdfStatus('idle');
+            setPdfUri('');
+            setPdfHtml('');
+            Alert.alert('Reporte Eliminado', 'El archivo PDF del reporte ha sido borrado de la memoria.');
+          }
+        }
+      ]
+    );
+  };
   
   // 1. Calculate General Aggregations
-  const totalSalesVolume = salesHistory.reduce((sum, s) => sum + s.total, 0);
-  const totalTransactions = salesHistory.length;
+  const totalSalesVolume = safeSalesHistory.reduce((sum, s) => sum + (s?.total || 0), 0);
+  const totalTransactions = safeSalesHistory.length;
   const averageTicket = totalTransactions > 0 ? totalSalesVolume / totalTransactions : 0;
   
   // 2. Calculate Payment Method Breakdown
   const paymentTotals = { Efectivo: 0, Yape: 0, Plin: 0, Tarjeta: 0 };
-  salesHistory.forEach(s => {
+  safeSalesHistory.forEach(s => {
+    if (!s) return;
     const method = s.method || 'Efectivo';
+    const amount = s.total || 0;
     if (paymentTotals[method] !== undefined) {
-      paymentTotals[method] += s.total;
+      paymentTotals[method] += amount;
     } else {
-      paymentTotals.Efectivo += s.total;
+      paymentTotals.Efectivo += amount;
     }
   });
 
   // 3. Top Selling Products Calculation
-  // We parse the product list from salesHistory items. If sales history has mock items without productLists, we do fallbacks.
   const productSalesMap = {};
   
-  salesHistory.forEach(sale => {
-    if (sale.productsList && Array.isArray(sale.productsList)) {
+  safeSalesHistory.forEach(sale => {
+    if (!sale) return;
+    if (sale.productsList && Array.isArray(sale.productsList) && sale.productsList.length > 0) {
       sale.productsList.forEach(item => {
+        if (!item || !item.name) return;
         if (!productSalesMap[item.name]) {
           productSalesMap[item.name] = { name: item.name, qty: 0, total: 0 };
         }
-        productSalesMap[item.name].qty += item.qty;
-        productSalesMap[item.name].total += (item.qty * item.price);
+        productSalesMap[item.name].qty += (item.qty || 1);
+        productSalesMap[item.name].total += ((item.qty || 1) * (item.price || 0));
       });
     } else {
-      // Mock fallback: map random sales to products to populate reports with nice data
-      const mockProdName = products[Math.floor(sale.total % products.length)]?.name || "Coca Cola 500 ml";
+      const prodIndex = safeProducts.length > 0 ? Math.floor((sale.total || 1) % safeProducts.length) : 0;
+      const mockProdName = safeProducts[prodIndex]?.name || "Producto General";
       const itemQty = sale.items || 1;
       if (!productSalesMap[mockProdName]) {
         productSalesMap[mockProdName] = { name: mockProdName, qty: 0, total: 0 };
       }
       productSalesMap[mockProdName].qty += itemQty;
-      productSalesMap[mockProdName].total += sale.total;
+      productSalesMap[mockProdName].total += (sale.total || 0);
     }
   });
 
@@ -101,34 +135,89 @@ export default function ReportsScreen({ onBack, salesHistory, products, loggedUs
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Botón Generar PDF */}
-        <TouchableOpacity 
-          style={styles.btnPdfReport} 
-          onPress={handleGeneratePdf}
-        >
-          <Text style={{ fontSize: 18 }}>📄</Text>
-          <Text style={styles.btnPdfReportText}>Generar Reporte PDF</Text>
-        </TouchableOpacity>
+        {/* Botón Generar PDF y Reiniciar Ventas */}
+        <View style={{ gap: 10, marginBottom: 20 }}>
+          <TouchableOpacity 
+            style={[styles.btnPdfReport, { marginBottom: 0 }]} 
+            onPress={handleGeneratePdf}
+          >
+            <Text style={{ fontSize: 18 }}>📄</Text>
+            <Text style={styles.btnPdfReportText}>Generar Reporte PDF</Text>
+          </TouchableOpacity>
+
+          {onResetSalesHistory && (
+            <TouchableOpacity 
+              style={{
+                backgroundColor: 'rgba(255, 149, 0, 0.12)',
+                borderWidth: 1,
+                borderColor: '#FF9500',
+                borderRadius: 14,
+                paddingVertical: 12,
+                alignItems: 'center'
+              }}
+              onPress={() => {
+                Alert.alert(
+                  '🔄 Reiniciar Ventas a S/ 0.00',
+                  '¿Deseas vaciar el historial de ventas acumuladas para empezar un reporte totalmente en S/ 0.00?',
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Sí, Reiniciar a S/ 0.00', style: 'destructive', onPress: onResetSalesHistory }
+                  ]
+                );
+              }}
+            >
+              <Text style={{ color: '#FF9500', fontWeight: '700', fontSize: 13 }}>
+                🔄 Vaciar Ventas y Empezar en S/ 0.00
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Summary Cards */}
         <TutorialStep stepName="reports_view">
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCard}>
-              <View style={styles.cardHeader}>
-                <DollarSign size={16} color={THEME.colors.primary} />
-                <Text style={styles.cardLabel}>Ventas Totales</Text>
+          <View style={{ gap: 12, marginBottom: 20 }}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryCard}>
+                <View style={styles.cardHeader}>
+                  <DollarSign size={16} color={THEME.colors.primary} />
+                  <Text style={styles.cardLabel}>Ventas Totales</Text>
+                </View>
+                <Text style={styles.cardValue}>S/ {totalSalesVolume.toFixed(2)}</Text>
+                <Text style={styles.cardSub}>Acumulado total</Text>
               </View>
-              <Text style={styles.cardValue}>S/ {totalSalesVolume.toFixed(2)}</Text>
-              <Text style={styles.cardSub}>Acumulado total</Text>
+
+              <View style={styles.summaryCard}>
+                <View style={styles.cardHeader}>
+                  <TrendingUp size={16} color={THEME.colors.primary} />
+                  <Text style={styles.cardLabel}>Ticket Promedio</Text>
+                </View>
+                <Text style={styles.cardValue}>S/ {averageTicket.toFixed(2)}</Text>
+                <Text style={styles.cardSub}>Por transacción</Text>
+              </View>
             </View>
 
-            <View style={styles.summaryCard}>
-              <View style={styles.cardHeader}>
-                <TrendingUp size={16} color={THEME.colors.primary} />
-                <Text style={styles.cardLabel}>Ticket Promedio</Text>
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryCard, { borderColor: 'rgba(0, 210, 106, 0.3)' }]}>
+                <View style={styles.cardHeader}>
+                  <Text style={{ fontSize: 14 }}>📦</Text>
+                  <Text style={styles.cardLabel}>Valor del Inventario</Text>
+                </View>
+                <Text style={[styles.cardValue, { color: THEME.colors.primary }]}>
+                  S/ {safeProducts.reduce((sum, p) => sum + ((p?.price || 0) * (p?.stock || 0)), 0).toFixed(2)}
+                </Text>
+                <Text style={styles.cardSub}>En stock disponible</Text>
               </View>
-              <Text style={styles.cardValue}>S/ {averageTicket.toFixed(2)}</Text>
-              <Text style={styles.cardSub}>Por transacción</Text>
+
+              <View style={styles.summaryCard}>
+                <View style={styles.cardHeader}>
+                  <Award size={16} color={THEME.colors.primary} />
+                  <Text style={styles.cardLabel}>Catálogo / Stock</Text>
+                </View>
+                <Text style={styles.cardValue}>{safeProducts.length} prod.</Text>
+                <Text style={styles.cardSub}>
+                  {safeProducts.reduce((sum, p) => sum + (p?.stock || 0), 0)} unidades totales
+                </Text>
+              </View>
             </View>
           </View>
         </TutorialStep>
@@ -217,16 +306,31 @@ export default function ReportsScreen({ onBack, salesHistory, products, loggedUs
                 <View style={styles.successIconCircle}>
                   <Text style={{ fontSize: 30 }}>✅</Text>
                 </View>
-                <Text style={styles.modalTitle}>Reporte generado correctamente</Text>
-                <Text style={styles.modalSub}>El archivo PDF está listo para compartir o guardar.</Text>
+                <Text style={styles.modalTitle}>Reporte PDF Listo</Text>
+                <Text style={styles.modalSub}>Selecciona una opción para guardar, abrir o compartir tu documento.</Text>
 
-                <View style={{ gap: 10, width: '100%', marginTop: 20 }}>
+                <View style={{ gap: 10, width: '100%', marginTop: 16 }}>
                   <TouchableOpacity 
                     style={styles.btnPrimaryAction} 
-                    onPress={() => sharePdfFile(pdfUri)}
+                    onPress={() => sharePdfFile(pdfUri, pdfHtml)}
                   >
-                    <Text style={styles.btnText}>Compartir</Text>
+                    <Text style={styles.btnText}>📱 Compartir por WhatsApp / App</Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.btnPrimaryAction, { backgroundColor: THEME.colors.primaryDark }]} 
+                    onPress={() => previewOrPrintPdf(pdfHtml, pdfUri)}
+                  >
+                    <Text style={styles.btnText}>🖨️ Ver / Guardar como PDF</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.btnSecondaryCancel, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' }]} 
+                    onPress={handleDeletePdf}
+                  >
+                    <Text style={{ color: THEME.colors.danger, fontWeight: '700', textAlign: 'center' }}>🗑️ Eliminar Reporte Generado</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity 
                     style={styles.btnSecondaryCancel} 
                     onPress={() => setPdfStatus('idle')}

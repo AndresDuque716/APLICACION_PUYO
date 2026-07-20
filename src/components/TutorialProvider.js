@@ -9,17 +9,24 @@ export function TutorialProvider({ children, currentRoute, setCurrentRoute, logg
   const [isTutorialActive, setIsTutorialActive] = useState(false);
   const [layouts, setLayouts] = useState({});
 
-  // 1. Check if tutorial is completed on mount or when user logs in
+  const getTutorialKey = (user) => {
+    const safeUser = (user || 'guest').replace(/[^a-zA-Z0-9]/g, '_');
+    return `@vendix_tutorial_completed_${safeUser}`;
+  };
+
+  // 1. Verificar si el usuario actual ya completó el tutorial
   useEffect(() => {
     const checkTutorialStatus = async () => {
-      // Only show tutorial if user is logged in
       if (!loggedInUser) {
         setIsTutorialActive(false);
         return;
       }
       try {
-        const completed = await AsyncStorage.getItem('@vendix_tutorial_completed');
-        if (completed !== 'true') {
+        const userKey = getTutorialKey(loggedInUser);
+        const userCompleted = await AsyncStorage.getItem(userKey);
+        
+        // Si este usuario NO ha completado el tutorial previamente
+        if (userCompleted !== 'true') {
           setIsTutorialActive(true);
           setActiveStep(0);
         } else {
@@ -29,10 +36,11 @@ export function TutorialProvider({ children, currentRoute, setCurrentRoute, logg
         console.error('Error checking tutorial status:', err);
       }
     };
+
     checkTutorialStatus();
   }, [loggedInUser]);
 
-  // 2. Control navigation during tutorial step changes
+  // 2. Controlar la navegación según la ruta requerida en cada paso del tutorial
   useEffect(() => {
     if (isTutorialActive) {
       const step = TUTORIAL_STEPS[activeStep];
@@ -53,8 +61,11 @@ export function TutorialProvider({ children, currentRoute, setCurrentRoute, logg
     if (activeStep < TUTORIAL_STEPS.length - 1) {
       setActiveStep((prev) => prev + 1);
     } else {
-      // Completed last step (Final Screen)
+      // Paso final completado
       try {
+        if (loggedInUser) {
+          await AsyncStorage.setItem(getTutorialKey(loggedInUser), 'true');
+        }
         await AsyncStorage.setItem('@vendix_tutorial_completed', 'true');
         setIsTutorialActive(false);
         setActiveStep(0);
@@ -73,6 +84,9 @@ export function TutorialProvider({ children, currentRoute, setCurrentRoute, logg
 
   const skipTutorial = async () => {
     try {
+      if (loggedInUser) {
+        await AsyncStorage.setItem(getTutorialKey(loggedInUser), 'true');
+      }
       await AsyncStorage.setItem('@vendix_tutorial_completed', 'true');
       setIsTutorialActive(false);
       setActiveStep(0);
@@ -84,6 +98,9 @@ export function TutorialProvider({ children, currentRoute, setCurrentRoute, logg
 
   const resetTutorial = async () => {
     try {
+      if (loggedInUser) {
+        await AsyncStorage.removeItem(getTutorialKey(loggedInUser));
+      }
       await AsyncStorage.removeItem('@vendix_tutorial_completed');
       setActiveStep(0);
       setIsTutorialActive(true);

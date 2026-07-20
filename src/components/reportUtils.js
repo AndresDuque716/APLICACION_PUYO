@@ -5,16 +5,22 @@
  */
 
 // 1. Calcula agregaciones métricas generales
-export function calculateSummaryMetrics(salesHistory, products) {
-  const totalSalesVolume = salesHistory.reduce((sum, s) => sum + s.total, 0);
-  const totalTransactions = salesHistory.length;
+export function calculateSummaryMetrics(salesHistory = [], products = []) {
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+
+  const totalSalesVolume = safeSales.reduce((sum, s) => sum + (s?.total || 0), 0);
+  const totalTransactions = safeSales.length;
   const averageTicket = totalTransactions > 0 ? totalSalesVolume / totalTransactions : 0;
   
-  const registeredCount = products.length;
-  const outOfStockCount = products.filter(p => p.stock === 0).length;
-  const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
+  const registeredCount = safeProducts.length;
+  const outOfStockCount = safeProducts.filter(p => p && p.stock === 0).length;
+  const lowStockCount = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5).length;
   
-  const categories = [...new Set(products.map(p => p.category))];
+  const totalValuation = safeProducts.reduce((sum, p) => sum + ((p?.price || 0) * (p?.stock || 0)), 0);
+  const totalStockUnits = safeProducts.reduce((sum, p) => sum + (p?.stock || 0), 0);
+
+  const categories = [...new Set(safeProducts.map(p => p?.category).filter(Boolean))];
   const categoriesCount = categories.length;
 
   return {
@@ -24,17 +30,21 @@ export function calculateSummaryMetrics(salesHistory, products) {
     registeredCount,
     outOfStockCount,
     lowStockCount,
-    categoriesCount
+    categoriesCount,
+    totalValuation,
+    totalStockUnits
   };
 }
 
 // 2. Calcula desglose por métodos de pago
-export function calculatePaymentBreakdown(salesHistory) {
+export function calculatePaymentBreakdown(salesHistory = []) {
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
   const paymentTotals = { Efectivo: 0, Yape: 0, Plin: 0, Tarjeta: 0, Transferencia: 0 };
   const paymentCounts = { Efectivo: 0, Yape: 0, Plin: 0, Tarjeta: 0, Transferencia: 0 };
   
   let totalVolume = 0;
-  salesHistory.forEach(s => {
+  safeSales.forEach(s => {
+    if (!s) return;
     const method = s.method || 'Efectivo';
     const amount = s.total || 0;
     if (paymentTotals[method] !== undefined) {
@@ -62,27 +72,32 @@ export function calculatePaymentBreakdown(salesHistory) {
 }
 
 // 3. Calcula productos más vendidos
-export function calculateTopSellingProducts(salesHistory, products, limit = 5) {
+export function calculateTopSellingProducts(salesHistory = [], products = [], limit = 5) {
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
+  const safeProducts = Array.isArray(products) ? products : [];
   const productSalesMap = {};
   
-  salesHistory.forEach(sale => {
-    if (sale.productsList && Array.isArray(sale.productsList)) {
+  safeSales.forEach(sale => {
+    if (!sale) return;
+    if (sale.productsList && Array.isArray(sale.productsList) && sale.productsList.length > 0) {
       sale.productsList.forEach(item => {
+        if (!item || !item.name) return;
         if (!productSalesMap[item.name]) {
           productSalesMap[item.name] = { name: item.name, qty: 0, total: 0 };
         }
-        productSalesMap[item.name].qty += item.qty;
-        productSalesMap[item.name].total += (item.qty * item.price);
+        productSalesMap[item.name].qty += (item.qty || 1);
+        productSalesMap[item.name].total += ((item.qty || 1) * (item.price || 0));
       });
     } else {
       // Fallback
-      const mockProdName = products[Math.floor(sale.total % products.length)]?.name || "Coca Cola 500 ml";
+      const prodIndex = safeProducts.length > 0 ? Math.floor((sale.total || 1) % safeProducts.length) : 0;
+      const mockProdName = safeProducts[prodIndex]?.name || "Producto General";
       const itemQty = sale.items || 1;
       if (!productSalesMap[mockProdName]) {
         productSalesMap[mockProdName] = { name: mockProdName, qty: 0, total: 0 };
       }
       productSalesMap[mockProdName].qty += itemQty;
-      productSalesMap[mockProdName].total += sale.total;
+      productSalesMap[mockProdName].total += (sale.total || 0);
     }
   });
 
@@ -92,40 +107,43 @@ export function calculateTopSellingProducts(salesHistory, products, limit = 5) {
 }
 
 // 4. Genera recomendaciones automáticas inteligentes
-export function generateRecommendations(salesHistory, products) {
+export function generateRecommendations(salesHistory = [], products = []) {
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
   const recommendations = [];
-  const metrics = calculateSummaryMetrics(salesHistory, products);
-  const paymentBreakdown = calculatePaymentBreakdown(salesHistory);
-  const topProducts = calculateTopSellingProducts(salesHistory, products, 3);
+
+  const metrics = calculateSummaryMetrics(safeSales, safeProducts);
+  const paymentBreakdown = calculatePaymentBreakdown(safeSales);
+  const topProducts = calculateTopSellingProducts(safeSales, safeProducts, 3);
 
   // A. Recomendación de stock agotado
-  const outOfStockList = products.filter(p => p.stock === 0);
+  const outOfStockList = safeProducts.filter(p => p && p.stock === 0);
   if (outOfStockList.length > 0) {
     recommendations.push(`⚠️ Se recomienda reabastecer urgentemente los siguientes productos agotados: ${outOfStockList.slice(0, 3).map(p => p.name).join(', ')}.`);
   }
 
   // B. Recomendación de stock crítico
-  const lowStockList = products.filter(p => p.stock > 0 && p.stock <= 5);
+  const lowStockList = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5);
   if (lowStockList.length > 0) {
     const firstLow = lowStockList[0];
     recommendations.push(`📉 El producto ${firstLow.name} tiene pocas unidades (${firstLow.stock} restantes). Considera solicitar un pedido al proveedor.`);
   }
 
-  // C. Recomendación sobre método de pago
+  // C. Recomendación sobre valor de inventario
+  if (metrics.totalValuation > 0) {
+    recommendations.push(`💰 El valor estimado del inventario disponible en almacén asciende a S/ ${metrics.totalValuation.toFixed(2)} (${metrics.totalStockUnits} unidades totales).`);
+  }
+
+  // D. Recomendación sobre método de pago
   const highestPayment = [...paymentBreakdown].sort((a, b) => b.percentage - a.percentage)[0];
   if (highestPayment && highestPayment.percentage > 0) {
     recommendations.push(`📱 Las ventas mediante ${highestPayment.method} representan el ${highestPayment.percentage.toFixed(0)}% de los ingresos totales. Asegura tener tus códigos QR e integraciones listos.`);
   }
 
-  // D. Recomendación de producto estrella
+  // E. Recomendación de producto estrella
   if (topProducts.length > 0) {
     const star = topProducts[0];
     recommendations.push(`🏆 El producto "${star.name}" es tu artículo estrella con ${star.qty} unidades vendidas. Mantén siempre un stock de seguridad alto para este producto.`);
-  }
-
-  // E. Recomendación general sobre el inventario
-  if (metrics.registeredCount < 10) {
-    recommendations.push(`📦 Tienes pocos productos registrados en tu catálogo (${metrics.registeredCount}). Ampliar tu oferta te ayudará a incrementar las ventas.`);
   }
 
   // Fallbacks para asegurar que siempre haya al menos 3 recomendaciones profesionales

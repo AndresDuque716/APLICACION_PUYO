@@ -5,25 +5,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ------------------------------------------------------------------------
 // CONFIGURACIÓN DE FIREBASE PARA VENDIX
-// ------------------------------------------------------------------------
-// Instrucciones para el usuario:
-// 1. Ve a https://console.firebase.google.com/
-// 2. Crea un proyecto gratuito llamado "Vendix"
-// 3. Agrega una aplicación de tipo "Web" y copia la configuración aquí.
-// 4. Activa "Autenticación por Correo/Contraseña" en la pestaña Authentication.
-// 5. Crea una base de datos "Cloud Firestore" en modo prueba.
+// Proyecto oficial: vendix-3cedd
+// Package Name: com.vendixapp.puyo
 // ------------------------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDgPjcCEDVlq566zhIvPFSSNX5DrwFTuEI",
+  authDomain: "vendix-3cedd.firebaseapp.com",
+  projectId: "vendix-3cedd",
+  storageBucket: "vendix-3cedd.firebasestorage.app",
+  messagingSenderId: "280749789909",
+  appId: "1:280749789909:android:46121f2c35eabbcdfd885c"
 };
 
-// Detectar si el usuario ya ingresó sus credenciales de Firebase
-const isFirebaseConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+// Detectar si las credenciales oficiales están configuradas
+const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY");
 
 let app = null;
 let auth = null;
@@ -36,7 +31,7 @@ if (isFirebaseConfigured) {
       persistence: getReactNativePersistence(AsyncStorage)
     });
     db = getFirestore(app);
-    console.log("🔥 Firebase inicializado con éxito.");
+    console.log("🔥 Firebase inicializado con éxito para vendix-3cedd.");
   } catch (error) {
     console.error("⚠️ Error inicializando Firebase:", error);
   }
