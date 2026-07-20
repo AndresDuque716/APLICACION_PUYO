@@ -762,30 +762,40 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       // 1. Borrar datos e inventarios de la base de datos Cloud Firestore
       if (isFirebaseConfigured && db) {
         try {
-          const uid = (auth && auth.currentUser) 
-            ? auth.currentUser.uid 
-            : (loggedInUser ? loggedInUser.replace(/[^a-zA-Z0-9]/g, '_') : 'vendix_user_main');
-
-          // Borrar todos los productos de Firestore
-          const productsColRef = collection(db, "users", uid, "products");
-          const productsSnapshot = await getDocs(productsColRef);
-          for (const docSnap of productsSnapshot.docs) {
-            await deleteDoc(doc(db, "users", uid, "products", docSnap.id));
+          const uidsToDelete = new Set();
+          if (auth && auth.currentUser && auth.currentUser.uid) {
+            uidsToDelete.add(auth.currentUser.uid);
           }
-
-          // Borrar todas las ventas de Firestore
-          const salesColRef = collection(db, "users", uid, "sales");
-          const salesSnapshot = await getDocs(salesSnapshot.docs ? salesColRef : salesColRef);
-          const salesDocs = await getDocs(salesColRef);
-          for (const docSnap of salesDocs.docs) {
-            await deleteDoc(doc(db, "users", uid, "sales", docSnap.id));
+          if (loggedInUser) {
+            uidsToDelete.add(loggedInUser.replace(/[^a-zA-Z0-9]/g, '_'));
           }
+          uidsToDelete.add('vendix_user_main');
 
-          // Borrar el documento principal del usuario
-          await deleteDoc(doc(db, "users", uid));
-          console.log(`🔥 Datos borrados completamente de Cloud Firestore para usuario (${uid}).`);
+          for (const uid of uidsToDelete) {
+            try {
+              // Borrar todos los productos de Firestore
+              const productsColRef = collection(db, "users", uid, "products");
+              const productsSnapshot = await getDocs(productsColRef);
+              for (const docSnap of productsSnapshot.docs) {
+                await deleteDoc(doc(db, "users", uid, "products", docSnap.id));
+              }
+
+              // Borrar todas las ventas de Firestore
+              const salesColRef = collection(db, "users", uid, "sales");
+              const salesSnapshot = await getDocs(salesColRef);
+              for (const docSnap of salesSnapshot.docs) {
+                await deleteDoc(doc(db, "users", uid, "sales", docSnap.id));
+              }
+
+              // Borrar el documento principal del usuario
+              await deleteDoc(doc(db, "users", uid));
+              console.log(`🔥 Datos borrados completamente de Cloud Firestore para (${uid}).`);
+            } catch (delErr) {
+              console.log(`Nota eliminación UID (${uid}):`, delErr);
+            }
+          }
         } catch (fsDelErr) {
-          console.log("Nota eliminación Firestore:", fsDelErr);
+          console.log("Nota eliminación general Firestore:", fsDelErr);
         }
       }
 
