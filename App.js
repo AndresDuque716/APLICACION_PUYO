@@ -28,7 +28,11 @@ import {
   Bell, 
   X, 
   ChevronRight, 
-  Camera as CameraIcon 
+  Camera as CameraIcon,
+  Settings,
+  HelpCircle,
+  RotateCcw,
+  Trash2
 } from 'lucide-react-native';
 
 // Constants and Screens
@@ -125,6 +129,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   const [selectedBranch, setSelectedBranch] = useState('Mi Sucursal');
   const [branches, setBranches] = useState(['Mi Sucursal']);
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Camera permissions states
@@ -209,27 +214,20 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     const loadPersistedData = async () => {
       try {
         // Limpieza automática única para vaciar la app de datos demo anteriores
-        const mockCleared = await AsyncStorage.getItem('@vendix_mock_data_cleared');
-        if (mockCleared !== 'true') {
-          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
-          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
-          await AsyncStorage.setItem('@vendix_mock_data_cleared', 'true');
-          setProducts([]);
-          setSalesHistory([]);
+        const storedProducts = await AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS);
+        if (storedProducts && JSON.parse(storedProducts).length > 0) {
+          setProducts(JSON.parse(storedProducts));
         } else {
-          const storedProducts = await AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS);
-          if (storedProducts) {
-            setProducts(JSON.parse(storedProducts));
-          } else {
-            await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
-          }
+          setProducts(INITIAL_PRODUCTS);
+          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
+        }
 
-          const storedSalesHistory = await AsyncStorage.getItem(STORAGE_KEYS.SALES_HISTORY);
-          if (storedSalesHistory) {
-            setSalesHistory(JSON.parse(storedSalesHistory));
-          } else {
-            await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
-          }
+        const storedSalesHistory = await AsyncStorage.getItem(STORAGE_KEYS.SALES_HISTORY);
+        if (storedSalesHistory && JSON.parse(storedSalesHistory).length > 0) {
+          setSalesHistory(JSON.parse(storedSalesHistory));
+        } else {
+          setSalesHistory(INITIAL_SALES);
+          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(INITIAL_SALES));
         }
 
         const storedCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
@@ -300,12 +298,19 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
 
       // 2. Cargar almacenamiento local propio de esta cuenta
       const localProds = await AsyncStorage.getItem(prodKey);
-      if (localProds) {
+      if (localProds && JSON.parse(localProds).length > 0) {
         setProducts(JSON.parse(localProds));
+      } else {
+        setProducts(INITIAL_PRODUCTS);
+        await AsyncStorage.setItem(prodKey, JSON.stringify(INITIAL_PRODUCTS));
       }
+
       const localSales = await AsyncStorage.getItem(salesKey);
-      if (localSales) {
+      if (localSales && JSON.parse(localSales).length > 0) {
         setSalesHistory(JSON.parse(localSales));
+      } else {
+        setSalesHistory(INITIAL_SALES);
+        await AsyncStorage.setItem(salesKey, JSON.stringify(INITIAL_SALES));
       }
 
       // 3. Sincronizar con Firestore de esta cuenta
@@ -1066,12 +1071,6 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
         onRequestClose={() => setSidebarOpen(false)}
       >
         <View style={styles.sidebarOverlay}>
-          <TouchableOpacity 
-            style={{ flex: 1 }} 
-            activeOpacity={1} 
-            onPress={() => setSidebarOpen(false)} 
-          />
-          
           <View style={styles.sidebarContent}>
             <View style={styles.sidebarHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -1103,56 +1102,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
                   style={styles.sidebarMenuBtn}
                   onPress={() => { 
                     setSidebarOpen(false); 
-                    Alert.alert(
-                      'Configuraciones',
-                      'Selecciona una opción:',
-                      [
-                        {
-                          text: 'Ver tutorial nuevamente',
-                          onPress: () => {
-                            resetTutorial();
-                          }
-                        },
-                        {
-                          text: 'Restablecer base de datos (Vaciar)',
-                          onPress: () => {
-                            Alert.alert(
-                              'Confirmación',
-                              '¿Estás seguro de que deseas borrar todos los productos y ventas? Esta acción no se puede deshacer.',
-                              [
-                                { text: 'Cancelar', style: 'cancel' },
-                                { 
-                                  text: 'Borrar todo', 
-                                  style: 'destructive',
-                                  onPress: async () => {
-                                    try {
-                                      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
-                                      await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
-                                      setProducts([]);
-                                      setSalesHistory([]);
-                                      Alert.alert('Éxito', 'La base de datos ha sido vaciada por completo.');
-                                    } catch (err) {
-                                      console.error(err);
-                                    }
-                                  }
-                                }
-                              ]
-                            );
-                          }
-                        },
-                        {
-                          text: '🗑️ Eliminar Cuenta Definitivamente',
-                          style: 'destructive',
-                          onPress: () => {
-                            handleDeleteAccount();
-                          }
-                        },
-                        {
-                          text: 'Cancelar',
-                          style: 'cancel'
-                        }
-                      ]
-                    );
+                    setSettingsModalOpen(true);
                   }}
                 >
                   <Text style={{ color: THEME.colors.textWhite, fontSize: 13.5 }}>Configuraciones</Text>
@@ -1193,7 +1143,125 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
               </View>
             </View>
           </View>
+
+          <TouchableOpacity 
+            style={{ flex: 1 }} 
+            activeOpacity={1} 
+            onPress={() => setSidebarOpen(false)} 
+          />
         </View>
+      </Modal>
+
+      {/* CONFIGURACIONES MODAL */}
+      <Modal
+        visible={settingsModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSettingsModalOpen(false)}
+      >
+        <TouchableOpacity 
+          style={styles.settingsModalOverlay}
+          activeOpacity={1}
+          onPress={() => setSettingsModalOpen(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={(e) => e.stopPropagation?.()} 
+            style={styles.settingsModalContent}
+          >
+            <View style={styles.settingsModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.settingsModalIconWrapper}>
+                  <Settings size={20} color={THEME.colors.primary} />
+                </View>
+                <Text style={styles.settingsModalTitle}>Configuraciones</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSettingsModalOpen(false)} style={{ padding: 4 }}>
+                <X size={20} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.settingsModalSubtitle}>
+              Selecciona una opción de configuración:
+            </Text>
+
+            <View style={{ gap: 10, marginBottom: 16 }}>
+              {/* Option 1: Tutorial */}
+              <TouchableOpacity 
+                style={styles.settingsOptionBtn}
+                onPress={() => {
+                  setSettingsModalOpen(false);
+                  resetTutorial();
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <HelpCircle size={18} color={THEME.colors.primary} />
+                  <Text style={styles.settingsOptionText}>Ver tutorial nuevamente</Text>
+                </View>
+                <ChevronRight size={16} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+
+              {/* Option 2: Reset DB */}
+              <TouchableOpacity 
+                style={styles.settingsOptionBtn}
+                onPress={() => {
+                  setSettingsModalOpen(false);
+                  Alert.alert(
+                    'Confirmación',
+                    '¿Estás seguro de que deseas borrar todos los productos y ventas? Esta acción no se puede deshacer.',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { 
+                        text: 'Borrar todo', 
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+                            await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+                            setProducts([]);
+                            setSalesHistory([]);
+                            Alert.alert('Éxito', 'La base de datos ha sido vaciada por completo.');
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <RotateCcw size={18} color="#f59e0b" />
+                  <Text style={styles.settingsOptionText}>Restablecer base de datos (Vaciar)</Text>
+                </View>
+                <ChevronRight size={16} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+
+              {/* Option 3: Delete Account */}
+              <TouchableOpacity 
+                style={[styles.settingsOptionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}
+                onPress={() => {
+                  setSettingsModalOpen(false);
+                  handleDeleteAccount();
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Trash2 size={18} color={THEME.colors.danger} />
+                  <Text style={[styles.settingsOptionText, { color: THEME.colors.danger }]}>Eliminar Cuenta Definitivamente</Text>
+                </View>
+                <ChevronRight size={16} color={THEME.colors.danger} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Cancel button */}
+            <TouchableOpacity 
+              style={styles.settingsCancelBtn}
+              onPress={() => setSettingsModalOpen(false)}
+            >
+              <Text style={{ color: THEME.colors.textGray, fontSize: 13.5, fontWeight: '600' }}>Cerrar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* CAMERA BARCODE SCANNER MODAL */}
@@ -1696,5 +1764,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
+  },
+
+  // Settings Modal Styles
+  settingsModalOverlay: {
+    flex: 1,
+    backgroundColor: THEME.colors.overlay || 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  settingsModalContent: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: THEME.colors.card,
+    borderRadius: 20,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  settingsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  settingsModalIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 210, 106, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: THEME.colors.textWhite,
+  },
+  settingsModalSubtitle: {
+    fontSize: 13,
+    color: THEME.colors.textGray,
+    marginBottom: 18,
+  },
+  settingsOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: THEME.colors.inputBg,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+  },
+  settingsOptionText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: THEME.colors.textWhite,
+  },
+  settingsCancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
   }
 });

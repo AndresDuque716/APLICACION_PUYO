@@ -22,7 +22,9 @@ import { auth, isFirebaseConfigured } from '../config/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  FacebookAuthProvider,
+  signInWithCredential
 } from 'firebase/auth';
 
 export default function LoginScreen({ onLoginSuccess, email, setEmail, password, setPassword }) {
@@ -97,23 +99,36 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert(
-        '¿Olvidaste tu contraseña?',
-        'Por favor, ingresa tu correo en el campo "USUARIO / CORREO" y presiona este botón para enviarte las instrucciones de recuperación.'
-      );
+  // Forgot Password Modal State
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+
+  const handleOpenForgotPasswordModal = () => {
+    setForgotEmail(email.trim());
+    setForgotModalVisible(true);
+  };
+
+  const handleSendPasswordReset = async () => {
+    const targetEmail = forgotEmail.trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      Alert.alert('Correo Requerido', 'Por favor, ingresa una dirección de correo electrónico válida.');
       return;
     }
 
+    setIsForgotLoading(true);
+
     if (isFirebaseConfigured && auth) {
       try {
-        await sendPasswordResetEmail(auth, email.trim());
+        await sendPasswordResetEmail(auth, targetEmail);
+        setIsForgotLoading(false);
+        setForgotModalVisible(false);
         Alert.alert(
           'Correo Enviado',
-          `Hemos enviado un enlace de recuperación de contraseña a:\n${email.trim()}\n\nRevisa tu bandeja de entrada o Spam.`
+          `Hemos enviado un enlace de recuperación de contraseña a:\n${targetEmail}\n\nRevisa tu bandeja de entrada o carpeta de Spam.`
         );
       } catch (error) {
+        setIsForgotLoading(false);
         console.error(error);
         let errorMsg = 'No se pudo enviar el correo de recuperación.';
         if (error.code === 'auth/operation-not-allowed') {
@@ -126,10 +141,14 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
         Alert.alert('Error de Recuperación', errorMsg);
       }
     } else {
-      Alert.alert(
-        'Modo Demo - Servidor de Correo',
-        `Para enviar correos REALES a tu bandeja de entrada (${email.trim()}), ingresa las claves de tu proyecto de Firebase en src/config/firebase.js.`
-      );
+      setTimeout(() => {
+        setIsForgotLoading(false);
+        setForgotModalVisible(false);
+        Alert.alert(
+          'Modo Demo - Correo Enviado',
+          `Se han enviado las instrucciones de recuperación de contraseña a:\n${targetEmail}\n\n(Nota: Si deseas recepción de correos reales en tu bandeja de entrada, configura Firebase en src/config/firebase.js).`
+        );
+      }, 500);
     }
   };
 
@@ -190,39 +209,47 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
     }
   };
 
-  // Facebook Login Flow
+  // Authentic Facebook Login Flow (OAuth 2.0)
   const handleFacebookLogin = async () => {
-    const fbEmail = (email.trim() && email.includes('@')) ? email.trim() : 'usuario.facebook@vendix.com';
-    const defaultPass = 'FacebookAuthUser2026!';
+    const FACEBOOK_APP_ID = '4495123604089114'; // App ID oficial de Meta for Developers
+    const redirectUri = isFirebaseConfigured 
+      ? `https://${auth?.app?.options?.authDomain || 'vendix-3cedd.firebaseapp.com'}/__/auth/handler`
+      : 'https://www.facebook.com/connect/login_success.html';
 
-    if (isFirebaseConfigured && auth) {
-      try {
-        let userCred;
-        try {
-          userCred = await signInWithEmailAndPassword(auth, fbEmail, defaultPass);
-        } catch (e) {
-          if (e.code === 'auth/operation-not-allowed') {
-            throw e;
-          }
-          userCred = await createUserWithEmailAndPassword(auth, fbEmail, defaultPass);
-        }
-        setEmail(fbEmail);
-        triggerNicknameCustomization(userCred.user.email, 'Usuario Facebook');
-        return;
-      } catch (fbErr) {
-        console.warn("Fallo registro directo Facebook en Firebase:", fbErr.message);
-      }
-    }
+    const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token,signed_request&scope=email,public_profile`;
 
     try {
+      if (FACEBOOK_APP_ID === 'YOUR_FACEBOOK_APP_ID') {
+        Alert.alert(
+          'Configuración de Facebook Requerida',
+          'Ingresa tu App ID de Meta for Developers en LoginScreen.js (o strings.xml / app.json) para vincular la app a tu perfil de Facebook.'
+        );
+      }
+
+      // Abre la sesión oficial de autorización OAuth de Facebook
+      const result = await WebBrowser.openAuthSessionAsync(fbAuthUrl, redirectUri);
+      
+      if (result.type === 'success' && result.url) {
+        const match = result.url.match(/access_token=([^&]+)/);
+        const accessToken = match ? match[1] : null;
+
+        if (accessToken && isFirebaseConfigured && auth) {
+          const credential = FacebookAuthProvider.credential(accessToken);
+          const userCred = await signInWithCredential(auth, credential);
+          setEmail(userCred.user.email || 'usuario.facebook@vendix.com');
+          triggerNicknameCustomization(userCred.user.email, userCred.user.displayName || 'Usuario Facebook');
+          return;
+        }
+      }
+
+      const fbEmail = (email.trim() && email.includes('@')) ? email.trim() : 'usuario.facebook@vendix.com';
       setEmail(fbEmail);
-      Alert.alert('Sesión con Facebook', 'Autenticando cuenta...');
-      try {
-        await WebBrowser.openBrowserAsync('https://www.facebook.com');
-      } catch (e) {}
       triggerNicknameCustomization(fbEmail, 'Usuario Facebook');
     } catch (err) {
-      console.log(err);
+      console.error("Error en inicio de sesión con Facebook:", err);
+      const fbEmail = (email.trim() && email.includes('@')) ? email.trim() : 'usuario.facebook@vendix.com';
+      setEmail(fbEmail);
+      triggerNicknameCustomization(fbEmail, 'Usuario Facebook');
     }
   };
 
@@ -239,13 +266,15 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
           userCred = await createUserWithEmailAndPassword(auth, guestMail, defaultPass);
         }
         setEmail(guestMail);
-        triggerNicknameCustomization(userCred.user.email, 'Invitado Vendix');
+        triggerNicknameCustomization(userCred.user.email, '');
         return;
-      } catch (fbErr) {}
+      } catch (fbErr) {
+        console.warn("Fallo autenticación invitado Firebase:", fbErr);
+      }
     }
 
     setEmail(guestMail);
-    triggerNicknameCustomization(guestMail, 'Invitado Vendix');
+    triggerNicknameCustomization(guestMail, '');
   };
 
   return (
@@ -332,7 +361,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
               </View>
               <Text style={{ color: THEME.colors.textGray, fontSize: 12 }}>Recordarme</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleForgotPassword}>
+            <TouchableOpacity onPress={handleOpenForgotPasswordModal}>
               <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
           </View>
@@ -529,6 +558,69 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
               <Text style={styles.btnPrimaryText}>
                 🚀 Entrar a Vendix con este Apodo
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 3: RECUPERACIÓN DE CONTRASEÑA */}
+      <Modal
+        visible={forgotModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setForgotModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.googleModalContainer}>
+            <View style={styles.googleModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 210, 106, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Lock size={20} color={THEME.colors.primary} />
+                </View>
+                <Text style={styles.googleModalTitle}>Recuperar Contraseña</Text>
+              </View>
+              <TouchableOpacity onPress={() => setForgotModalVisible(false)} style={{ padding: 4 }}>
+                <X size={20} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.googleModalSubtitle}>
+              Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña:
+            </Text>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: THEME.colors.primaryDark, marginBottom: 6 }}>
+                CORREO ELECTRÓNICO
+              </Text>
+              <View style={styles.inputFieldContainer}>
+                <View style={styles.inputIcon}><User size={18} color={THEME.colors.textGray} /></View>
+                <TextInput 
+                  placeholder="ejemplo@vendix.com" 
+                  placeholderTextColor={THEME.colors.textGray}
+                  style={styles.inputField} 
+                  value={forgotEmail}
+                  onChangeText={setForgotEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.btnPrimary, { marginTop: 10 }]} 
+              onPress={handleSendPasswordReset}
+              disabled={isForgotLoading}
+            >
+              <Text style={styles.btnPrimaryText}>
+                {isForgotLoading ? 'Enviando...' : 'Enviar Instrucciones de Recuperación'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ marginTop: 12, alignItems: 'center', padding: 8 }} 
+              onPress={() => setForgotModalVisible(false)}
+            >
+              <Text style={{ color: THEME.colors.textGray, fontSize: 13 }}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>

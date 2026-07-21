@@ -27,7 +27,9 @@ import {
   TrendingUp,
   X,
   Check,
-  Plus
+  Plus,
+  Pencil,
+  Store
 } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
@@ -58,10 +60,26 @@ export default function DashboardScreen({
   const [newBranchInput, setNewBranchInput] = useState('');
   const [dateFilter, setDateFilter] = useState('Hoy'); // 'Hoy', 'Ayer', 'Esta semana'
 
+  // Automatic store name prompt on first login or default
+  useEffect(() => {
+    const checkStorePrompt = async () => {
+      try {
+        const storePrompted = await AsyncStorage.getItem('@vendix_store_prompted');
+        if (!storePrompted && (selectedBranch === 'Mi Sucursal' || selectedBranch === 'Mi Negocio' || loggedInUser?.toLowerCase().includes('invitado'))) {
+          setBranchModalVisible(true);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkStorePrompt();
+  }, []);
+
   const handleSelectBranch = async (branch) => {
     setSelectedBranch(branch);
     try {
       await AsyncStorage.setItem('@vendix_selected_branch', branch);
+      await AsyncStorage.setItem('@vendix_store_prompted', 'true');
       if (isFirebaseConfigured && auth && auth.currentUser) {
         const uid = auth.currentUser.uid;
         await setDoc(doc(db, "users", uid, "settings", "branches"), {
@@ -107,10 +125,21 @@ export default function DashboardScreen({
     }
   };
 
-  const getUserDisplayName = (email) => {
-    if (!email) return 'Juan'; // Fallback a Juan si no está definido
-    const parts = email.split('@');
+  const getUserDisplayName = (userStr) => {
+    if (!userStr) return selectedBranch || 'Mi Local';
+    
+    if (userStr.includes('(')) {
+      const nickname = userStr.split('(')[0].trim();
+      if (nickname && nickname.toLowerCase() !== 'invitado' && nickname.toLowerCase() !== 'invitado vendix' && nickname.toLowerCase() !== 'mi negocio') {
+        return nickname;
+      }
+    }
+    
+    const parts = userStr.split('@');
     const name = parts[0];
+    if (!name || name.toLowerCase() === 'invitado' || name.toLowerCase() === 'demo') {
+      return selectedBranch || 'Mi Local';
+    }
     return name.charAt(0).toUpperCase() + name.slice(1);
   };
   
@@ -129,24 +158,22 @@ export default function DashboardScreen({
   const getFilteredSales = () => {
     if (dateFilter === 'Hoy') {
       return salesHistory.filter(s => 
-        s.time.includes('min') || s.time.includes('hora') || s.time.includes('momento')
+        s.time?.includes('min') || s.time?.includes('hora') || s.time?.includes('momento') || !s.time
       );
     } else if (dateFilter === 'Ayer') {
-      // Simulate yesterday sales
-      return salesHistory.filter(s => s.time.includes('2 horas') || s.time.includes('3 horas'));
+      return salesHistory.filter(s => s.time?.includes('2 horas') || s.time?.includes('3 horas'));
     } else {
-      // 'Esta semana' -> All sales in history
       return salesHistory;
     }
   };
 
   const filteredSales = getFilteredSales();
-  const salesTotal = filteredSales.reduce((sum, s) => sum + s.total, 0);
+  const salesTotal = filteredSales.reduce((sum, s) => sum + (s.total || 0), 0);
   const earningsTotal = salesTotal * 0.30; // Estimate 30% profit margin
   const ordersCount = filteredSales.length;
-  const productsSold = filteredSales.reduce((sum, s) => sum + s.items, 0);
+  const productsSold = filteredSales.reduce((sum, s) => sum + (s.items || 0), 0);
   
-  const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
+  const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0);
   const outOfStockCount = products.filter(p => p.stock === 0).length;
   const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
 
@@ -154,69 +181,67 @@ export default function DashboardScreen({
   const agotadosProducts = products.filter(p => p.stock === 0);
 
   // ----------------------------------------------------
-  // Dynamic Chart Calculations (Last 7 Days)
+  // Dynamic Weekly Sales Chart Calculations
   // ----------------------------------------------------
-  const getWeeklySalesArray = () => {
-    const totals = [0, 0, 0, 0, 0, 0, 0]; // Lun, Mar, Mié, Jue, Vie, Sáb, Dom
+  const getWeeklySalesData = () => {
+    const chartDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const now = new Date();
-    
-    // Find the start of the current week (Monday 00:00)
-    const currentDay = now.getDay(); // 0 = Dom, 1 = Lun, ..., 6 = Sáb
-    const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const mondayDate = new Date(now);
-    mondayDate.setDate(now.getDate() - distanceToMonday);
-    mondayDate.setHours(0, 0, 0, 0);
+    const currentDayIdx = (now.getDay() + 6) % 7; // 0 = Lun, 1 = Mar, ..., 6 = Dom
+
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - currentDayIdx);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const dayTotals = [0, 0, 0, 0, 0, 0, 0];
 
     salesHistory.forEach(sale => {
-      const saleDate = sale.timestamp ? new Date(sale.timestamp) : now;
-      if (saleDate >= mondayDate) {
-        let dayIdx = saleDate.getDay() - 1; // 0 = Lun, ..., 5 = Sáb, -1 = Dom
-        if (dayIdx === -1) dayIdx = 6; // Dom
+      let saleDate = null;
+      if (sale.timestamp) {
+        saleDate = new Date(sale.timestamp);
+      } else if (sale.date) {
+        saleDate = new Date(sale.date);
+      }
+      
+      if (!saleDate || isNaN(saleDate.getTime())) {
+        saleDate = now;
+      }
+
+      if (saleDate >= monday && saleDate <= sunday) {
+        let dayIdx = (saleDate.getDay() + 6) % 7;
         if (dayIdx >= 0 && dayIdx <= 6) {
-          totals[dayIdx] += sale.total;
+          dayTotals[dayIdx] += (sale.total || 0);
         }
       }
     });
 
-    // Fallback seed curve to avoid flat empty lines when database is reset
-    const allZero = totals.every(t => t === 0);
-    if (allZero) {
-      return [0, 0, 0, 0, 0, 0, 0];
-    }
-    return totals;
+    const isAllZero = dayTotals.every(t => t === 0);
+    const displayTotals = isAllZero ? [120.0, 240.0, 180.0, 310.0, 450.0, 520.0, 390.0] : dayTotals;
+    const maxVal = Math.max(...displayTotals, 500);
+    const weeklyTotalSum = displayTotals.reduce((a, b) => a + b, 0);
+
+    return {
+      chartDays,
+      displayTotals,
+      actualTotals: dayTotals,
+      maxVal,
+      currentDayIdx,
+      weeklyTotalSum,
+      isDemoData: isAllZero
+    };
   };
 
-  const weeklySales = getWeeklySalesArray();
-  const maxWeeklySale = Math.max(...weeklySales, 500); // minimum scale ceiling
-
-  const chartWidth = 300;
-  const chartHeight = 100;
-  const paddingLeft = 20;
-  const paddingRight = 280;
-  const chartDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-  // Calculate chart point coordinates
-  const chartPoints = chartDays.map((day, idx) => {
-    const x = paddingLeft + (idx * (paddingRight - paddingLeft)) / 6;
-    const value = weeklySales[idx];
-    const y = 90 - (value / maxWeeklySale) * 75; // map to svg coordinates y=15 to y=90
-    return { x, y, value, day };
-  });
-
-  // Construct SVG Path
-  const buildSvgPath = () => {
-    if (chartPoints.length === 0) return '';
-    let path = `M ${chartPoints[0].x},${chartPoints[0].y}`;
-    for (let i = 1; i < chartPoints.length; i++) {
-      path += ` L ${chartPoints[i].x},${chartPoints[i].y}`;
-    }
-    return path;
-  };
-
-  const linePath = buildSvgPath();
-  const fillPath = chartPoints.length > 0 
-    ? `${linePath} L ${chartPoints[chartPoints.length - 1].x},90 L ${chartPoints[0].x},90 Z`
-    : '';
+  const {
+    chartDays,
+    displayTotals,
+    maxVal: maxWeeklySale,
+    currentDayIdx,
+    weeklyTotalSum,
+    isDemoData
+  } = getWeeklySalesData();
 
   // ----------------------------------------------------
   // Stock Refill Handler
@@ -246,16 +271,18 @@ export default function DashboardScreen({
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* 1. Greeting Row */}
       <View style={styles.greetingRow}>
-        <View>
-          <Text style={styles.greetingTitle}>¡Bienvenido, {getUserDisplayName(loggedInUser)}!</Text>
-          <TouchableOpacity 
-            style={styles.branchSelector}
-            onPress={() => setBranchModalVisible(true)}
-          >
+        <TouchableOpacity onPress={() => setBranchModalVisible(true)} activeOpacity={0.8}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.greetingTitle}>¡Bienvenido, {getUserDisplayName(loggedInUser)}!</Text>
+            <View style={{ backgroundColor: 'rgba(0, 210, 106, 0.15)', padding: 4, borderRadius: 12 }}>
+              <Pencil size={12} color={THEME.colors.primary} />
+            </View>
+          </View>
+          <View style={styles.branchSelector}>
             <Text style={styles.branchText}>{selectedBranch}</Text>
             <ChevronDown size={14} color={THEME.colors.primary} />
-          </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
         
         {/* Date Selector */}
         <TouchableOpacity 
@@ -332,69 +359,77 @@ export default function DashboardScreen({
       {/* 3. Gráfico de la semana */}
       <View style={{ marginTop: 24 }}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeaderTitle}>Ventas de la semana</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.sectionHeaderTitle}>Ventas de la semana</Text>
+            {isDemoData && (
+              <View style={{ backgroundColor: 'rgba(0, 210, 106, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ color: THEME.colors.primary, fontSize: 10, fontWeight: '700' }}>DEMO</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.periodSelector}>
-            <Text style={{ fontSize: 12, color: THEME.colors.textWhite, fontWeight: '600' }}>Esta semana</Text>
+            <Text style={{ fontSize: 12, color: THEME.colors.textWhite, fontWeight: '600' }}>
+              Total: S/ {weeklyTotalSum.toFixed(2)}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.chartCard}>
-          <View style={styles.chartYAxis}>
-            <Text style={styles.chartYText}>{maxWeeklySale >= 1000 ? `${(maxWeeklySale/1000).toFixed(1)}k` : maxWeeklySale.toFixed(0)}</Text>
-            <Text style={styles.chartYText}>{(maxWeeklySale * 0.66).toFixed(0)}</Text>
-            <Text style={styles.chartYText}>{(maxWeeklySale * 0.33).toFixed(0)}</Text>
-            <Text style={styles.chartYText}>0</Text>
+        <View style={styles.chartCardNew}>
+          {/* Y Axis scale Ticks */}
+          <View style={styles.chartYAxisNew}>
+            <Text style={styles.chartYText}>S/ {maxWeeklySale >= 1000 ? `${(maxWeeklySale/1000).toFixed(1)}k` : maxWeeklySale.toFixed(0)}</Text>
+            <Text style={styles.chartYText}>S/ {(maxWeeklySale * 0.5).toFixed(0)}</Text>
+            <Text style={styles.chartYText}>S/ 0</Text>
           </View>
-          
-          <View style={styles.chartMain}>
-            <View style={{ height: 100, width: '100%' }}>
-              <Svg style={{ width: '100%', height: '100%' }} viewBox="0 0 300 100">
-                <Defs>
-                  <LinearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0%" stopColor="#00d26a" stopOpacity={0.3} />
-                    <Stop offset="100%" stopColor="#00d26a" stopOpacity={0} />
-                  </LinearGradient>
-                </Defs>
-                
-                {/* Horizontal Grid Lines */}
-                <Line x1="0" y1="10" x2="300" y2="10" stroke={THEME.colors.border} strokeWidth="1" />
-                <Line x1="0" y1="36.7" x2="300" y2="36.7" stroke={THEME.colors.border} strokeWidth="1" />
-                <Line x1="0" y1="63.3" x2="300" y2="63.3" stroke={THEME.colors.border} strokeWidth="1" />
-                <Line x1="0" y1="90" x2="300" y2="90" stroke={THEME.colors.border} strokeWidth="1" />
 
-                {/* Curved paths dynamic */}
-                {fillPath !== '' && <Path d={fillPath} fill="url(#chartGlow)" />}
-                {linePath !== '' && (
-                  <Path 
-                    d={linePath} 
-                    fill="none" 
-                    stroke={THEME.colors.primary} 
-                    strokeWidth="3" 
-                    strokeLinecap="round" 
-                  />
-                )}
-                
-                {/* Circles for points */}
-                {chartPoints.map((p, idx) => (
-                  <Circle 
-                    key={idx} 
-                    cx={p.x} 
-                    cy={p.y} 
-                    r="4.5" 
-                    fill={THEME.colors.textWhite} 
-                    stroke={THEME.colors.primary} 
-                    strokeWidth="2" 
-                  />
-                ))}
-              </Svg>
-            </View>
+          {/* 7 Columns Container (Flex 1 each) */}
+          <View style={styles.chartColumnsContainer}>
+            {chartDays.map((day, idx) => {
+              const val = displayTotals[idx];
+              const heightPct = Math.min(100, Math.max(10, (val / maxWeeklySale) * 100));
+              const isToday = idx === currentDayIdx;
 
-            {/* X Axis Labels */}
-            <View style={styles.chartXAxis}>
-              {chartPoints.map((p, idx) => (
-                <Text key={idx} style={styles.chartXText}>{p.day}</Text>
-              ))}
-            </View>
+              return (
+                <View key={day} style={styles.chartColumn}>
+                  {/* Top Value Tooltip */}
+                  <Text 
+                    style={[
+                      styles.chartBarValue, 
+                      isToday && { color: THEME.colors.primary, fontWeight: '700' }
+                    ]} 
+                    numberOfLines={1}
+                  >
+                    {val >= 1000 ? `${(val/1000).toFixed(1)}k` : `${val.toFixed(0)}`}
+                  </Text>
+
+                  {/* Bar Container Track */}
+                  <View style={styles.chartBarTrack}>
+                    <View 
+                      style={[
+                        styles.chartBarFill,
+                        { 
+                          height: `${heightPct}%`,
+                          backgroundColor: isToday 
+                            ? THEME.colors.primary 
+                            : val > 0 
+                              ? 'rgba(0, 210, 106, 0.45)' 
+                              : 'rgba(255, 255, 255, 0.08)',
+                          borderColor: isToday ? '#ffffff' : 'transparent',
+                          borderWidth: isToday ? 1 : 0
+                        }
+                      ]}
+                    />
+                  </View>
+
+                  {/* X Axis Day Label Badge */}
+                  <View style={[styles.chartDayBadge, isToday && styles.chartDayBadgeToday]}>
+                    <Text style={[styles.chartXTextNew, isToday && { color: '#000000', fontWeight: '700' }]}>
+                      {day}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         </View>
       </View>
@@ -493,7 +528,7 @@ export default function DashboardScreen({
         </View>
       </View>
 
-      {/* MODAL: Branch Selector */}
+      {/* MODAL: Branch / Store Name Selector */}
       <Modal
         visible={branchModalVisible}
         transparent={true}
@@ -507,23 +542,62 @@ export default function DashboardScreen({
         >
           <TouchableOpacity 
             activeOpacity={1} 
-            style={[styles.modalContent, { width: '85%', maxWidth: 340 }]}
+            style={[styles.modalContent, { width: '85%', maxWidth: 360, padding: 20 }]}
           >
-            <Text style={styles.modalTitle}>Selecciona Sucursal</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Store size={20} color={THEME.colors.primary} />
+                <Text style={styles.modalTitle}>Nombre de tu Local</Text>
+              </View>
+              <TouchableOpacity onPress={() => setBranchModalVisible(false)}>
+                <X size={18} color={THEME.colors.textGray} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={{ color: THEME.colors.textGray, fontSize: 12, marginBottom: 14 }}>
+              Configura el nombre de tu negocio o sucursal activa:
+            </Text>
+
             {branches.map((branch) => (
               <TouchableOpacity 
                 key={branch}
                 style={styles.modalListItem}
                 onPress={() => handleSelectBranch(branch)}
               >
-                <Text style={{ color: THEME.colors.textWhite, fontSize: 16 }}>{branch}</Text>
+                <Text style={{ color: THEME.colors.textWhite, fontSize: 14.5, fontWeight: '500' }}>{branch}</Text>
                 {selectedBranch === branch && <Check size={18} color={THEME.colors.primary} />}
               </TouchableOpacity>
             ))}
 
-            {/* Sección para agregar sucursal personalizada */}
-            <View style={{ borderTopWidth: 1, borderTopColor: THEME.colors.borderDark, paddingTop: 16, marginTop: 12, width: '100%' }}>
-              <Text style={{ color: THEME.colors.textGray, fontSize: 11, marginBottom: 8, fontWeight: '700', letterSpacing: 0.5 }}>AGREGAR SUCURSAL PERSONALIZADA</Text>
+            {/* Sugerencias rápidas */}
+            <Text style={{ color: THEME.colors.textGray, fontSize: 11, fontWeight: '700', marginTop: 12, marginBottom: 8, letterSpacing: 0.5 }}>
+              SUGERENCIAS RÁPIDAS:
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {['🏪 Bodega San Martín', '🛒 Minimarket El Sol', '🏬 Comercial Puyo', '🏠 Mi Tienda'].map((chip) => {
+                const cleanName = chip.replace(/^[^\s]+\s/, '');
+                return (
+                  <TouchableOpacity 
+                    key={chip} 
+                    style={{
+                      backgroundColor: THEME.colors.inputBg,
+                      borderWidth: 1,
+                      borderColor: selectedBranch === cleanName ? THEME.colors.primary : THEME.colors.borderDark,
+                      borderRadius: 16,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6
+                    }}
+                    onPress={() => handleSelectBranch(cleanName)}
+                  >
+                    <Text style={{ color: THEME.colors.textWhite, fontSize: 11.5, fontWeight: '500' }}>{chip}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Sección para agregar sucursal / nombre personalizado */}
+            <View style={{ borderTopWidth: 1, borderTopColor: THEME.colors.borderDark, paddingTop: 14, marginTop: 4, width: '100%' }}>
+              <Text style={{ color: THEME.colors.textGray, fontSize: 11, marginBottom: 8, fontWeight: '700', letterSpacing: 0.5 }}>ESCRIBIR OTRO NOMBRE DE LOCAL</Text>
               <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
                 <TextInput
                   style={{
@@ -535,9 +609,9 @@ export default function DashboardScreen({
                     paddingHorizontal: 12,
                     height: 40,
                     color: THEME.colors.textWhite,
-                    fontSize: 14
+                    fontSize: 13.5
                   }}
-                  placeholder="Nombre de sucursal..."
+                  placeholder="ej. Don Andrés, Bodega..."
                   placeholderTextColor={THEME.colors.textGray}
                   value={newBranchInput}
                   onChangeText={setNewBranchInput}
@@ -553,7 +627,7 @@ export default function DashboardScreen({
                   }}
                   onPress={handleAddNewBranch}
                 >
-                  <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', fontSize: 13 }}>Agregar</Text>
+                  <Text style={{ color: THEME.colors.textWhite, fontWeight: '700', fontSize: 13 }}>Guardar</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -932,6 +1006,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     height: 160,
+  },
+  chartCardNew: {
+    backgroundColor: THEME.colors.card,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 180,
+  },
+  chartYAxisNew: {
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingBottom: 22,
+    paddingTop: 18,
+  },
+  chartColumnsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    height: '100%',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  chartColumn: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  chartBarValue: {
+    fontSize: 9.5,
+    color: THEME.colors.textGray,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  chartBarTrack: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 8,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    width: '100%',
+    borderRadius: 8,
+  },
+  chartDayBadge: {
+    marginTop: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  chartDayBadgeToday: {
+    backgroundColor: THEME.colors.primary,
+  },
+  chartXTextNew: {
+    color: THEME.colors.textGray,
+    fontSize: 10.5,
+    fontWeight: '600',
   },
   chartYAxis: {
     justifyContent: 'space-between',
