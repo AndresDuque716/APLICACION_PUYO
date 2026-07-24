@@ -1,0 +1,53 @@
+===============================================
+  HISTORIAL DE CAMBIOS - VENDIX POS
+  Fecha: 24 de julio de 2026
+===============================================
+
+1. PANTALLA DE SPLASH (Video de introduccion)
+   - Reemplazada pantalla estatica por video Logo.mp4
+   - Video reproduce a pantalla completa con expo-av
+   - Fade out al terminar y transicion a login/dashboard
+
+2. PANTALLA DE LOGIN (Animacion de entrada)
+   - Logo sube desde el centro de la pantalla hacia arriba
+   - Logo inicia 96px mas abajo del centro (20% mas abajo)
+   - Sube durante 1125ms (lento)
+   - Logo se encoge al 75%
+   - Logo pulsa infinitamente (1 → 1.06 → 1, ciclo 1.8s)
+   - Contenido (tarjeta registro) aparece desde abajo con fade
+   - Logo y tarjeta de login apegados sin espacio
+   - Logo reemplazado por vendixlogo.png (125x313)
+
+3. COMPARTIR BOLETA (Share)
+   - Cambiado de captureRef (react-native-view-shot) a expo-print
+   - Genera PDF con HTML estilizado de la boleta
+   - PDF en formato A4 (595x842 puntos) con fuentes agrandadas
+   - Fuentes: titulo 36px, productos 16px, total 24px, stats 22px
+   - Funciona confiablemente en Android (sin captura de pantalla)
+
+4. CORRECCIONES DE ERRORES
+   - Eliminado handleShareBoleta duplicado en SaleDetailModal
+   - Corregidos paquetes desactualizados:
+     * expo-file-system v57 → v19 (SDK 54)
+     * expo-print v57 → v15 (SDK 54)
+     * expo-sharing v57 → v14 (SDK 54)
+     * react-native-safe-area-context v5.8 → v5.6
+     * react-native-view-shot v3.8 → v4.0
+   - Instalado expo-linear-gradient (para degradados, luego removido)
+
+5. BOLETA (SaleDetailModal)
+   - Extraido componente BoletaContent reutilizable
+   - Modal renderiza BoletaContent directamente
+   - PDF generado via HTML con expo-print para compartir
+
+===============================================
+  ARCHIVOS MODIFICADOS
+===============================================
+  - App.js (splash video, handleSplashFinish)
+  - src/screens/SplashScreen.js (video completo)
+  - src/screens/LoginScreen.js (animaciones)
+  - src/screens/SalesHistoryScreen.js (boleta PDF)
+  - package.json (versiones corregidas)
+  - assets/Logo.mp4 (nuevo)
+  - assets/logo.png (nuevo)
+===============================================

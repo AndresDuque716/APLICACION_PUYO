@@ -6,10 +6,13 @@ import {
   ScrollView, 
   TouchableOpacity, 
   TextInput, 
-  Modal, 
-  Alert 
+  Alert,
+  Image 
 } from 'react-native';
-import { Search, Camera as CameraIcon, Minus, Plus, Trash2, ChevronDown, Check } from 'lucide-react-native';
+
+const YAPE_LOGO = require('../../assets/yape-logo.png');
+const PLIN_LOGO = require('../../assets/plin-logo.png');
+import { Search, Camera as CameraIcon, Minus, Plus, Trash2, Check } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
 
@@ -26,7 +29,13 @@ export default function NuevaVentaScreen({
 }) {
   const [manualSearch, setManualSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
-  const [showMethodPicker, setShowMethodPicker] = useState(false);
+
+  const PAYMENT_METHODS = [
+    { label: 'Efectivo', icon: '💵', brandColor: '#2ECC71', useImage: false },
+    { label: 'Yape', image: YAPE_LOGO, brandColor: '#7B2FA2', useImage: true },
+    { label: 'Plin', image: PLIN_LOGO, brandColor: '#00C9B1', useImage: true },
+    { label: 'Tarjeta', icon: '💳', brandColor: '#FF6B00', useImage: false },
+  ];
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const discount = subtotal > 15 ? 1.50 : 0.00;
@@ -138,9 +147,19 @@ export default function NuevaVentaScreen({
                       <Minus size={12} color={THEME.colors.textWhite} />
                     </TouchableOpacity>
                     <Text style={{ minWidth: 16, textAlign: 'center', color: THEME.colors.textWhite, fontWeight: '600' }}>{item.qty}</Text>
-                    <TouchableOpacity style={{ padding: 4 }} onPress={() => onAddQty(item.id)}>
-                      <Plus size={12} color={THEME.colors.textWhite} />
-                    </TouchableOpacity>
+                    {(() => {
+                      const prod = products.find(p => p.name === item.name);
+                      const atMax = prod && item.qty >= prod.stock;
+                      return (
+                        <TouchableOpacity 
+                          style={{ padding: 4, opacity: atMax ? 0.3 : 1 }} 
+                          onPress={() => onAddQty(item.id)}
+                          disabled={atMax}
+                        >
+                          <Plus size={12} color={THEME.colors.textWhite} />
+                        </TouchableOpacity>
+                      );
+                    })()}
                   </View>
                   <TouchableOpacity 
                     style={{ padding: 6 }}
@@ -164,13 +183,42 @@ export default function NuevaVentaScreen({
       {cart.length > 0 && (
         <View style={{ marginTop: 20 }}>
           <Text style={styles.inputLabel}>MÉTODO DE PAGO</Text>
-          <TouchableOpacity 
-            style={[styles.inputFieldContainer, { justifyContent: 'space-between', paddingRight: 14, marginTop: 6 }]}
-            onPress={() => setShowMethodPicker(true)}
-          >
-            <Text style={{ color: THEME.colors.textWhite, fontSize: 14 }}>{paymentMethod}</Text>
-            <ChevronDown size={16} color={THEME.colors.textGray} />
-          </TouchableOpacity>
+          <View style={styles.paymentMethodsRow}>
+            {PAYMENT_METHODS.map((method) => {
+              const isSelected = paymentMethod === method.label;
+              return (
+                <TouchableOpacity
+                  key={method.label}
+                  style={[
+                    styles.paymentMethodCard,
+                    isSelected && { borderColor: method.brandColor, backgroundColor: method.brandColor + '25' }
+                  ]}
+                  onPress={() => setPaymentMethod(method.label)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.paymentMethodIcon, { backgroundColor: method.brandColor + '25' }]}>
+                    {method.useImage ? (
+                      <Image 
+                        source={method.image} 
+                        style={styles.paymentMethodLogo}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={[styles.paymentMethodIconText, { color: method.brandColor }]}>{method.icon}</Text>
+                    )}
+                  </View>
+                  <Text style={[styles.paymentMethodLabel, isSelected && { color: method.brandColor, fontWeight: '700' }]}>
+                    {method.label}
+                  </Text>
+                  {isSelected && (
+                    <View style={[styles.paymentMethodCheck, { backgroundColor: method.brandColor }]}>
+                      <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       )}
 
@@ -197,36 +245,6 @@ export default function NuevaVentaScreen({
         <Text style={{ color: THEME.colors.textWhite, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>Completar venta</Text>
       </TouchableOpacity>
 
-      {/* Method Picker Modal */}
-      <Modal
-        visible={showMethodPicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowMethodPicker(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMethodPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Método de Pago</Text>
-            {['Efectivo', 'Yape', 'Plin', 'Tarjeta'].map((method) => (
-              <TouchableOpacity 
-                key={method} 
-                style={styles.categoryItem} 
-                onPress={() => {
-                  setPaymentMethod(method);
-                  setShowMethodPicker(false);
-                }}
-              >
-                <Text style={{ color: THEME.colors.textWhite, fontSize: 16 }}>{method}</Text>
-                {paymentMethod === method && <Check size={18} color={THEME.colors.primary} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </ScrollView>
   );
 }
@@ -444,36 +462,57 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 15,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: THEME.colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+  paymentMethodsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
   },
-  modalContent: {
+  paymentMethodCard: {
+    flex: 1,
     backgroundColor: THEME.colors.card,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: THEME.colors.borderDark,
     borderRadius: 16,
-    width: '100%',
-    maxWidth: 300,
-    padding: 20,
-    maxHeight: 400,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 10,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: THEME.colors.textWhite,
-    marginBottom: 15,
+  paymentMethodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentMethodLogo: {
+    width: 32,
+    height: 32,
+  },
+  paymentMethodIconText: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  paymentMethodLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.colors.textGray,
     textAlign: 'center',
   },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  paymentMethodCheck: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.borderDark,
+    justifyContent: 'center',
   },
 });

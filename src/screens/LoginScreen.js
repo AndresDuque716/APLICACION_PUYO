@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -11,7 +11,8 @@ import {
   Platform, 
   Alert,
   Modal,
-  Dimensions
+  Dimensions,
+  Animated
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
@@ -31,6 +32,57 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Entrance animations
+  const logoTranslateY = useRef(new Animated.Value(96)).current;
+  const logoScale = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentTranslateY = useRef(new Animated.Value(40)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(logoTranslateY, {
+        toValue: 0,
+        duration: 1125,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 0.75,
+          duration: 625,
+          useNativeDriver: true,
+        }),
+        Animated.parallel([
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+          Animated.timing(contentTranslateY, {
+            toValue: 0,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.06,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    });
+  }, []);
   
   // Modals state
   const [googleModalVisible, setGoogleModalVisible] = useState(false);
@@ -284,20 +336,23 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
     >
       <ScrollView contentContainerStyle={styles.loginScrollContainer} keyboardShouldPersistTaps="handled">
         {/* Brand Header */}
-        <View style={styles.brandHeader}>
+        <Animated.View style={[styles.brandHeader, {
+          transform: [{ translateY: logoTranslateY }, { scale: Animated.multiply(logoScale, pulseAnim) }],
+        }]}>
           <View style={styles.logoWrapper}>
             <Image 
               source={require('../../assets/logo.png')} 
-              style={{ height: 52, width: 130, resizeMode: 'contain' }} 
+              style={{ height: 125, width: 313, resizeMode: 'contain' }} 
             />
-            <Text style={styles.logoText}>Vendix</Text>
           </View>
           <Text style={styles.slogan}>
             Controla. Vende. <Text style={{ color: THEME.colors.primary, fontWeight: '700' }}>Crece.</Text>
           </Text>
-        </View>
-
-        {/* Login Card */}
+        </Animated.View>
+        <Animated.View style={[{ width: '100%', alignItems: 'center', marginTop: -4 }, {
+          opacity: contentOpacity,
+          transform: [{ translateY: contentTranslateY }],
+        }]}>
         <View style={styles.loginCard}>
           <View style={styles.cardHeaderBadgeRow}>
             <View style={styles.liveStatusBadge}>
@@ -425,6 +480,7 @@ export default function LoginScreen({ onLoginSuccess, email, setEmail, password,
            <ShieldCheck size={16} color={THEME.colors.primary} style={{ marginRight: 6 }} />
            <Text style={{ color: THEME.colors.textGray, fontSize: 12 }}>Conexión encriptada & protegida | Vendix v1.0.0</Text>
         </View>
+        </Animated.View>
       </ScrollView>
 
       {/* MODAL 1: SELECCIÓN DE CUENTA GOOGLE */}
@@ -634,12 +690,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 40,
-    minHeight: Dimensions.get('window').height * 0.85,
+    paddingTop: 10,
+    paddingBottom: 20,
+    minHeight: Dimensions.get('window').height * 0.92,
   },
   brandHeader: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 0,
   },
   logoWrapper: {
     flexDirection: 'row',
@@ -647,13 +704,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoText: {
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: '800',
     color: THEME.colors.textWhite,
   },
   slogan: {
     color: THEME.colors.textLightGray,
-    marginTop: 6,
+    marginTop: 0,
+    marginBottom: -2,
     fontWeight: '500',
     letterSpacing: 1,
     fontSize: 14,

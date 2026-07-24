@@ -1,0 +1,94 @@
+===============================================
+  MEMORIA DE CONTEXTO - VENDIX POS
+  Proyecto: APLICACION_PUYO
+===============================================
+
+Que es Vendix?
+  Aplicacion movil POS (Punto de Venta) para negocios
+  en Peru. Permite registrar ventas, escanear codigos
+  de barras, gestionar productos, generar reportes PDF
+  y compartir boletas. Moneda: Soles (PEN).
+
+Stack tecnologico:
+  - React Native + Expo SDK 54
+  - Firebase (Auth + Firestore)
+  - expo-camera (escaner de barras)
+  - expo-av (video splash)
+  - expo-print (boletas PDF)
+  - expo-sharing (compartir PDFs)
+  - lucide-react-native (iconos)
+  - react-native-svg (logos/Ilustraciones)
+
+Color principal (THEME):
+  - Primary/Success: #00d26a / #22B15B (verde)
+  - Background: #080808 (casi negro)
+  - Card: #111111
+  - Texto: #FFFFFF / #8E8E93
+
+Estructura del proyecto:
+  App.js                    → Raiz, navegacion por estado (no React Navigation)
+  src/screens/
+    SplashScreen.js         → Video Logo.mp4 fullscreen, fade out al terminar
+    LoginScreen.js          → Login/Register con animaciones de entrada
+    DashboardScreen.js      → Resumen de ventas, metricas, alertas
+    ProductosScreen.js      → Catalogo de productos, filtros, categorias
+    NuevoProductoScreen.js  → Formulario crear producto
+    NuevaVentaScreen.js     → Scanner + carrito + cobro
+    SalesHistoryScreen.js   → Historial agrupado por fecha, boleta PDF
+    ReportsScreen.js        → Reportes y graficas
+  src/components/
+    TutorialProvider.js     → Contexto del tutorial interactivo
+    TutorialStep.js         → Paso individual del tutorial
+    TutorialOverlay.js      → Overlay del tutorial
+    tutorialData.js         → Datos/ pasos del tutorial
+    pdfGenerator.js         → Generador de PDFs
+    ReportTemplate.js       → Plantilla de reportes
+    reportUtils.js          → Utilidades de reportes
+  src/config/
+    firebase.js             → Config Firebase (vendix-3cedd)
+    analytics.js            → Google Analytics (GA4 stub)
+  src/constants/
+    theme.js                → THEME, STORAGE_KEYS, productos iniciales
+  assets/
+    Logo.mp4                → Video de splash
+    logo.png                → Logo vendix (vendixlogo.png)
+    yape-logo.png           → Logo Yape
+    plin-logo.png           → Logo Plin
+
+Navegacion (sin React Navigation):
+  currentRoute = 'splash' → 'login' → 'dashboard' | 'products' | 'sales' | 'scanner' | 'reports' | 'new-product'
+  Manejada con useState en App.js
+
+Funcionalidades implementadas:
+  1. Splash con video (expo-av)
+  2. Login con Firebase Auth (correo/contraseña + Google + Facebook + invitado)
+  3. Tutorial interactivo por pasos (TutorialProvider)
+  4. Dashboard con metricas de ventas
+  5. Catalogo de productos con busqueda y filtros
+  6. Categorias con emojis personalizados (guardados en AsyncStorage)
+  7. Eliminacion de categorias (excepto "Todos")
+  8. Escanner de codigos de barras (expo-camera)
+  9. Validacion de stock al agregar productos
+  10. Carrito de compras con cantidades
+  11. Metodos de pago: Efectivo, Yape, Plin, Tarjeta
+  12. Historial de ventas agrupado por fecha (Hoy/Ayer/Anteriores)
+  13. Boleta estilo ticket con detalle completo
+  14. Compartir boleta como PDF (expo-print + expo-sharing)
+  15. Reportes con graficas
+  16. Persistencia local (AsyncStorage) + Firebase sync
+
+Animaciones recientes (Login):
+  - Logo inicia 96px abajo del centro
+  - Sube en 1125ms (lento) hasta su posicion final
+  - Se encoge al 75%
+  - Pulsa infinitamente (1→1.06→1, ciclo 1.8s)
+  - Tarjeta de registro aparece desde abajo con fade
+
+Notas importantes:
+  - NO usar React Navigation, la navegacion es por estado
+  - Firebase configurado para proyecto vendix-3cedd
+  - El usuario prefiere cambios visuales/esteticos
+  - Moneda: Soles (PEN), formato peruano
+  - App solo funciona en Android (no web)
+  - expo-print para boletas (no react-native-view-shot)
+  - Paquetes deben ser version SDK 54 compatible

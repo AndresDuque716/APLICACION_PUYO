@@ -114,8 +114,6 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   const dynamicBottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 15 : 10);
   const dynamicTopInset = Math.max(insets.top, Platform.OS === 'android' ? 25 : 0);
 
-  const [progress, setProgress] = useState(0);
-  const [isExiting, setIsExiting] = useState(false);
   
   // Database States
   const [products, setProducts] = useState([]);
@@ -374,31 +372,14 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     }
   }, []);
 
-  // 2. Splash screen loading progress simulation
-  useEffect(() => {
-    if (currentRoute === 'splash') {
-      setProgress(0);
-      setIsExiting(false);
-      const interval = setInterval(() => {
-        setProgress((prevProgress) => {
-          if (prevProgress >= 100) {
-            clearInterval(interval);
-            setIsExiting(true);
-            setTimeout(() => {
-              if (loggedInUser) {
-                setCurrentRoute('dashboard');
-              } else {
-                setCurrentRoute('login');
-              }
-            }, 500);
-            return 100;
-          }
-          return prevProgress + 2.5;
-        });
-      }, 45);
-      return () => clearInterval(interval);
+  // 2. Splash screen → video finishes → navigate
+  const handleSplashFinish = () => {
+    if (loggedInUser) {
+      setCurrentRoute('dashboard');
+    } else {
+      setCurrentRoute('login');
     }
-  }, [currentRoute, loggedInUser]);
+  };
 
   // 3. Scan & Simulator Actions
   const triggerScanFlash = () => {
@@ -490,6 +471,15 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     const updatedCart = [...cart];
     const existing = updatedCart.find(item => item.name === (found ? found.name : data));
     if (existing) {
+      if (found && existing.qty >= found.stock) {
+        if (continuousScan) {
+          setScanToastMessage(`Sin stock: ${prodName}`);
+          setTimeout(() => setScanToastMessage(''), 2000);
+        } else {
+          Alert.alert('Stock máximo', `Solo hay ${found.stock} unidad(es) disponible(s) de "${prodName}".`);
+        }
+        return;
+      }
       existing.qty += 1;
     } else {
       updatedCart.push({
@@ -522,8 +512,16 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     const updatedCart = [...cart];
     const existing = updatedCart.find(item => item.name === randProd.name);
     if (existing) {
+      if (existing.qty >= randProd.stock) {
+        Alert.alert('Stock máximo', `Solo hay ${randProd.stock} unidad(es) disponible(s) de "${randProd.name}".`);
+        return;
+      }
       existing.qty += 1;
     } else {
+      if (randProd.stock < 1) {
+        Alert.alert('Sin stock', `"${randProd.name}" no tiene unidades disponibles.`);
+        return;
+      }
       updatedCart.push({
         id: Date.now(),
         name: randProd.name,
@@ -541,8 +539,16 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     const updatedCart = [...cart];
     const existing = updatedCart.find(item => item.name === product.name);
     if (existing) {
+      if (existing.qty >= product.stock) {
+        Alert.alert('Stock máximo', `Solo hay ${product.stock} unidad(es) disponible(s) de "${product.name}".`);
+        return;
+      }
       existing.qty += 1;
     } else {
+      if (product.stock < 1) {
+        Alert.alert('Sin stock', `"${product.name}" no tiene unidades disponibles.`);
+        return;
+      }
       updatedCart.push({
         id: Date.now(),
         name: product.name,
@@ -564,6 +570,12 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   };
 
   const handleAddQty = (id) => {
+    const cartItem = cart.find(item => item.id === id);
+    const product = products.find(p => p.id === id);
+    if (cartItem && product && cartItem.qty >= product.stock) {
+      Alert.alert('Stock máximo', `Solo hay ${product.stock} unidad(es) disponible(s) de "${product.name}".`);
+      return;
+    }
     const updatedCart = cart.map(item => item.id === id ? { ...item, qty: item.qty + 1 } : item);
     saveCartState(updatedCart);
   };
@@ -740,6 +752,16 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     }
   };
 
+  const handleDeleteCategory = async (catName) => {
+    try {
+      const updatedCats = categories.filter(c => c !== catName);
+      setCategories(updatedCats);
+      await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(updatedCats));
+    } catch (err) {
+      console.error('Error deleting category:', err);
+    }
+  };
+
   // Auth actions
   const handleLoginSuccess = async (userMail, userNickname) => {
     const finalMail = userMail || email || 'invitado@vendix.com';
@@ -907,7 +929,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       {/* RENDERIZADO DE PANTALLAS MODULARES */}
       <View style={styles.appViewContainer}>
         {currentRoute === 'splash' && (
-          <SplashScreen progress={progress} isExiting={isExiting} />
+          <SplashScreen onFinish={handleSplashFinish} />
         )}
         {currentRoute === 'login' && (
           <LoginScreen 
@@ -939,6 +961,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
             onNewProductClick={() => setCurrentRoute('new-product')} 
             onUpdateProductsList={handleUpdateProductsList}
             onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
           />
         )}
         {currentRoute === 'new-product' && (

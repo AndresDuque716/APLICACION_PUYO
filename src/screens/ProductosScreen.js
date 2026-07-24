@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -26,12 +26,27 @@ import {
   Camera as CameraIcon, 
   Check, 
   X, 
-  Scan 
+  Scan,
+  MoreHorizontal
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, Camera } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
+
+const CATEGORY_EMOJIS = {
+  'Todos': '📋',
+  'Bebidas': '🥤',
+  'Snacks': '🥔',
+  'Golosinas': '🍫',
+  'Abarrotes': '🍚',
+  'Lácteos': '🥛',
+  'Limpieza': '🧼',
+  'Otros': '📦',
+};
+
+const VISIBLE_CATEGORY_COUNT = 6;
 
 export default function ProductosScreen({ 
   products = [], 
@@ -39,7 +54,8 @@ export default function ProductosScreen({
   onAddProduct, 
   onNewProductClick,
   onUpdateProductsList,
-  onAddCategory
+  onAddCategory,
+  onDeleteCategory
 }) {
   const [categoriaActiva, setCategoriaActiva] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +63,13 @@ export default function ProductosScreen({
   // Custom Category prompt state
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState('📦');
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const emojiInputRef = useRef(null);
+  const tempEmojiRef = useRef('');
+  const [customEmojis, setCustomEmojis] = useState({});
+  const [allCategoriesModalVisible, setAllCategoriesModalVisible] = useState(false);
+  const [deleteCategoriesMode, setDeleteCategoriesMode] = useState(false);
 
   // Editing state
   const [editingProduct, setEditingProduct] = useState(null);
@@ -71,6 +94,18 @@ export default function ProductosScreen({
   useEffect(() => {
     setCurrentPage(1);
   }, [categoriaActiva, searchQuery, sortBy]);
+
+  // Load custom emojis from storage
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem('@vendix_custom_emojis');
+        if (saved) setCustomEmojis(JSON.parse(saved));
+      } catch (e) {}
+    })();
+  }, []);
+
+  const mergedEmojis = { ...CATEGORY_EMOJIS, ...customEmojis };
 
   // Filter and Sort products dynamically
   const getSortedAndFilteredProducts = () => {
@@ -274,9 +309,7 @@ export default function ProductosScreen({
       return;
     }
 
-    const categoryAvatars = {
-      Bebidas: '🥤', Snacks: '🥔', Golosinas: '🍫', Abarrotes: '🍚', Lácteos: '🥛', Limpieza: '🧼', Librería: '📓', Otro: '📦'
-    };
+    const categoryAvatars = mergedEmojis;
 
     const categoryImages = {
       Bebidas: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=600&auto=format&fit=crop',
@@ -285,7 +318,6 @@ export default function ProductosScreen({
       Abarrotes: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=600&auto=format&fit=crop',
       Lácteos: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop',
       Limpieza: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?q=80&w=600&auto=format&fit=crop',
-      Librería: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=600&auto=format&fit=crop',
       Otro: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=600&auto=format&fit=crop'
     };
 
@@ -321,9 +353,45 @@ export default function ProductosScreen({
     }
 
     onAddCategory(nameClean);
+    
+    // Save emoji mapping
+    const updatedEmojis = { ...customEmojis, [nameClean]: selectedEmoji };
+    setCustomEmojis(updatedEmojis);
+    AsyncStorage.setItem('@vendix_custom_emojis', JSON.stringify(updatedEmojis));
+    
     setNewCategoryName('');
+    setSelectedEmoji('📦');
     setCategoryModalVisible(false);
     Alert.alert('Categoría Creada', `Categoría "${nameClean}" registrada exitosamente.`);
+  };
+
+  // Delete category handler
+  const handleDeleteCategory = (catName) => {
+    if (catName === 'Todos') return;
+    
+    const productsInCategory = products.filter(p => p.category === catName).length;
+    const message = productsInCategory > 0
+      ? `Hay ${productsInCategory} producto(s) en "${catName}". ¿Deseas eliminar la categoría? Los productos no se eliminarán.`
+      : `¿Eliminar la categoría "${catName}"?`;
+
+    Alert.alert(
+      'Eliminar Categoría',
+      message,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            onDeleteCategory(catName);
+            if (categoriaActiva === catName) {
+              setCategoriaActiva('Todos');
+            }
+            Alert.alert('Eliminada', `Categoría "${catName}" eliminada.`);
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -362,42 +430,73 @@ export default function ProductosScreen({
         </View>
  
         {/* Categories Carousel */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            style={styles.categoriesHorizontalScroll}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            {categories.map((cat) => (
-              <TouchableOpacity 
-                key={cat} 
-                onPress={() => setCategoriaActiva(cat)}
-                style={categoriaActiva === cat ? styles.tagCategoryActive : styles.tagCategoryInactive}
+        <View style={styles.categoriesSectionContainer}>
+          <Text style={styles.inputLabel}>CATEGORÍAS</Text>
+          <View style={styles.categoriesRow}>
+            <View style={styles.categoriesScrollWrapper}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={{ gap: 8 }}
               >
-                <Text style={{ 
-                  color: categoriaActiva === cat ? THEME.colors.textWhite : THEME.colors.textGray, 
-                  fontSize: 13, 
-                  fontWeight: '600' 
-                }}>
-                  {cat}
-                </Text>
-                <View style={styles.tagCountBadge}>
-                  <Text style={{ color: THEME.colors.textWhite, fontSize: 10, fontWeight: '700' }}>
-                    {getCategoryCount(cat)}
-                  </Text>
-                </View>
+                {categories.map((cat) => {
+                  const emoji = mergedEmojis[cat] || '📦';
+                  const isActive = categoriaActiva === cat;
+                  return (
+                    <TouchableOpacity 
+                      key={cat} 
+                      onPress={() => setCategoriaActiva(cat)}
+                      style={[
+                        styles.categoryCard,
+                        isActive && styles.categoryCardActive
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        styles.categoryEmojiCircle,
+                        { backgroundColor: isActive ? '#22B15B25' : THEME.colors.inputBg }
+                      ]}>
+                        <Text style={styles.categoryEmojiText}>{emoji}</Text>
+                      </View>
+                      <Text style={[
+                        styles.categoryCardLabel,
+                        isActive && styles.categoryCardLabelActive
+                      ]}>
+                        {cat}
+                      </Text>
+                      <View style={[
+                        styles.categoryCountBadge,
+                        { backgroundColor: isActive ? '#22B15B30' : 'rgba(255,255,255,0.08)' }
+                      ]}>
+                        <Text style={[
+                          styles.categoryCountText,
+                          isActive && { color: THEME.colors.primary }
+                        ]}>
+                          {getCategoryCount(cat)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.categoryActionsColumn}>
+              <TouchableOpacity 
+                style={styles.btnAllCategories}
+                onPress={() => setAllCategoriesModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <MoreHorizontal size={16} color={THEME.colors.textGray} />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
- 
-          {/* Plus button to add custom categories */}
-          <TouchableOpacity 
-            style={styles.btnAddCatCircle}
-            onPress={() => setCategoryModalVisible(true)}
-          >
-            <Plus size={16} color={THEME.colors.textWhite} />
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.btnAddCatCircle}
+                onPress={() => setCategoryModalVisible(true)}
+              >
+                <Plus size={16} color={THEME.colors.textWhite} />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
  
         {/* List Grid of Products */}
@@ -546,6 +645,15 @@ export default function ProductosScreen({
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Nueva Categoría</Text>
+
+            <TouchableOpacity
+              style={styles.emojiSelectorBtn}
+              onPress={() => setEmojiPickerVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.emojiSelectorEmoji}>{selectedEmoji}</Text>
+              <Text style={styles.emojiSelectorLabel}>Tocar para cambiar emoji</Text>
+            </TouchableOpacity>
             
             <View style={styles.inputFieldContainer}>
               <TextInput 
@@ -576,6 +684,160 @@ export default function ProductosScreen({
         </TouchableOpacity>
       </Modal>
 
+      {/* MODAL: EMOJI PICKER */}
+      <Modal
+        visible={emojiPickerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setEmojiPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setEmojiPickerVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.emojiPickerContent}>
+            <Text style={styles.modalTitle}>Elige un Emoji</Text>
+            <Text style={{ color: THEME.colors.textGray, fontSize: 12, textAlign: 'center', marginBottom: 14 }}>
+              Escribe o pega un solo carácter (emoji o letra)
+            </Text>
+
+            <View style={styles.emojiInputPreview}>
+              <Text style={styles.emojiInputPreviewEmoji}>{selectedEmoji}</Text>
+            </View>
+
+            <View style={styles.emojiInputContainer}>
+              <TextInput
+                ref={emojiInputRef}
+                style={styles.emojiInputField}
+                placeholder="Escribe aquí"
+                placeholderTextColor={THEME.colors.textGray}
+                autoFocus
+                textAlign="center"
+                multiline={false}
+                numberOfLines={1}
+                onChangeText={(text) => {
+                  const graphemes = [...text];
+                  const firstChar = graphemes[0] || '';
+                  tempEmojiRef.current = firstChar;
+                  setSelectedEmoji(firstChar || '📦');
+                }}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { flex: 1, backgroundColor: THEME.colors.success }]}
+                onPress={() => {
+                  const text = tempEmojiRef.current;
+                  if (text && text.length > 0) {
+                    const graphemes = [...text];
+                    setSelectedEmoji(graphemes[graphemes.length - 1]);
+                  }
+                  setEmojiPickerVisible(false);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Listo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: THEME.colors.borderDark }]}
+                onPress={() => { setSelectedEmoji('📦'); setEmojiPickerVisible(false); }}
+              >
+                <Text style={{ color: THEME.colors.textGray, fontWeight: '600' }}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL: ALL CATEGORIES SELECTOR */}
+      <Modal
+        visible={allCategoriesModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => { setAllCategoriesModalVisible(false); setDeleteCategoriesMode(false); }}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1}
+          onPress={() => setAllCategoriesModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.allCategoriesModalContent}>
+            <Text style={styles.modalTitle}>Todas las Categorías</Text>
+            <Text style={{ color: THEME.colors.textGray, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
+              Selecciona una categoría para filtrar productos
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.deleteModeBtn, deleteCategoriesMode && styles.deleteModeBtnActive]}
+              onPress={() => setDeleteCategoriesMode(!deleteCategoriesMode)}
+              activeOpacity={0.7}
+            >
+              <Trash2 size={14} color={deleteCategoriesMode ? '#FFFFFF' : THEME.colors.danger} />
+              <Text style={[styles.deleteModeBtnText, deleteCategoriesMode && { color: '#FFFFFF' }]}>
+                {deleteCategoriesMode ? 'Cancelar' : 'Eliminar Categorías'}
+              </Text>
+            </TouchableOpacity>
+            
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.allCategoriesGrid}>
+                {categories.map((cat) => {
+                  const emoji = mergedEmojis[cat] || '📦';
+                const isActive = categoriaActiva === cat;
+                const isProtected = cat === 'Todos';
+                return (
+                  <View key={cat} style={styles.allCategoryItemWrapper}>
+                    <TouchableOpacity
+                      style={[
+                        styles.allCategoryItem,
+                        isActive && { borderColor: THEME.colors.primary, backgroundColor: '#22B15B18' }
+                      ]}
+                      onPress={() => {
+                        setCategoriaActiva(cat);
+                        setAllCategoriesModalVisible(false);
+                        setDeleteCategoriesMode(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.allCategoryEmoji}>{emoji}</Text>
+                      <Text style={[
+                        styles.allCategoryLabel,
+                        isActive && { color: THEME.colors.primary, fontWeight: '700' }
+                      ]}>
+                        {cat}
+                      </Text>
+                      <Text style={styles.allCategoryCount}>{getCategoryCount(cat)}</Text>
+                      {isActive && (
+                        <View style={styles.allCategoryCheck}>
+                          <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {!isProtected && deleteCategoriesMode && (
+                      <TouchableOpacity
+                        style={styles.allCategoryDeleteBtn}
+                        onPress={() => handleDeleteCategory(cat)}
+                        activeOpacity={0.6}
+                      >
+                        <Trash2 size={10} color={THEME.colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.modalBtn, { width: '100%', marginTop: 16, backgroundColor: 'transparent', borderWidth: 1, borderColor: THEME.colors.borderDark }]} 
+              onPress={() => { setAllCategoriesModalVisible(false); setDeleteCategoriesMode(false); }}
+            >
+              <Text style={{ color: THEME.colors.textGray, fontWeight: '600', textAlign: 'center' }}>Cerrar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* MODAL: SORT & FILTER OPTIONS */}
       <Modal
         visible={sortModalVisible}
@@ -588,38 +850,55 @@ export default function ProductosScreen({
           activeOpacity={1}
           onPress={() => setSortModalVisible(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { maxWidth: 300 }]}>
-            <Text style={styles.modalTitle}>Filtrar y Ordenar</Text>
+          <TouchableOpacity activeOpacity={1} style={styles.sortModalContent}>
             
-            <Text style={{ color: THEME.colors.textGray, fontSize: 11, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>ORDENAR POR</Text>
-            
+            <View style={styles.sortModalHeader}>
+              <View style={styles.sortModalIconCircle}>
+                <SlidersHorizontal size={20} color={THEME.colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.sortModalTitle}>Filtrar y Ordenar</Text>
+                <Text style={styles.sortModalSubtitle}>Ordena tu lista de productos</Text>
+              </View>
+            </View>
+
+            <View style={styles.sortModalDivider} />
+
+            <Text style={styles.sortModalSectionLabel}>ORDENAR POR</Text>
+
             {[
-              { label: '🔤 Nombre (A - Z)', value: 'name-asc' },
-              { label: '💵 Menor Precio primero', value: 'price-asc' },
-              { label: '💰 Mayor Precio primero', value: 'price-desc' },
-              { label: '📉 Menor Stock primero', value: 'stock-asc' },
-              { label: '📈 Mayor Stock primero', value: 'stock-desc' }
+              { label: 'Nombre (A - Z)', value: 'name-asc', icon: '🔤' },
+              { label: 'Menor Precio', value: 'price-asc', icon: '💵' },
+              { label: 'Mayor Precio', value: 'price-desc', icon: '💰' },
+              { label: 'Menor Stock', value: 'stock-asc', icon: '📉' },
+              { label: 'Mayor Stock', value: 'stock-desc', icon: '📈' }
             ].map((option) => {
               const isSelected = sortBy === option.value;
               return (
                 <TouchableOpacity
                   key={option.value}
-                  style={styles.modalListItem}
+                  style={[styles.sortOptionItem, isSelected && styles.sortOptionItemActive]}
                   onPress={() => {
                     setSortBy(option.value);
                     setSortModalVisible(false);
                   }}
+                  activeOpacity={0.7}
                 >
-                  <Text style={{ color: isSelected ? THEME.colors.primary : THEME.colors.textWhite, fontSize: 15, fontWeight: isSelected ? '700' : '500' }}>
+                  <Text style={styles.sortOptionIcon}>{option.icon}</Text>
+                  <Text style={[styles.sortOptionLabel, isSelected && { color: THEME.colors.primary, fontWeight: '700' }]}>
                     {option.label}
                   </Text>
-                  {isSelected && <Check size={16} color={THEME.colors.primary} />}
+                  {isSelected && (
+                    <View style={styles.sortOptionCheck}>
+                      <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
 
             <TouchableOpacity 
-              style={[styles.modalBtn, { width: '100%', marginTop: 15, backgroundColor: 'transparent', borderWidth: 1, borderColor: THEME.colors.borderDark }]} 
+              style={styles.sortModalCloseBtn} 
               onPress={() => setSortModalVisible(false)}
             >
               <Text style={{ color: THEME.colors.textGray, fontWeight: '600', textAlign: 'center' }}>Cerrar</Text>
@@ -928,45 +1207,228 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  categoriesHorizontalScroll: {
+  categoriesSectionContainer: {
+    marginBottom: 16,
+  },
+  categoriesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  categoriesScrollWrapper: {
     flex: 1,
   },
-  tagCategoryActive: {
-    backgroundColor: THEME.colors.success,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  tagCategoryInactive: {
+  categoryCard: {
     backgroundColor: THEME.colors.card,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.borderDark,
+    borderRadius: 12,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 68,
   },
-  tagCountBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+  categoryCardActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: '#00d26a18',
+  },
+  categoryEmojiCircle: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
-  },
-  btnAddCatCircle: {
-    backgroundColor: THEME.colors.card,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+  },
+  categoryEmojiText: {
+    fontSize: 14,
+    color: THEME.colors.primary,
+  },
+  categoryCardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: THEME.colors.textGray,
+    textAlign: 'center',
+  },
+  categoryCardLabelActive: {
+    color: THEME.colors.textWhite,
+    fontWeight: '700',
+  },
+  categoryCountBadge: {
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+  },
+  categoryCountText: {
+    color: THEME.colors.textGray,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  categoryActionsColumn: {
+    gap: 6,
+  },
+  btnAllCategories: {
+    backgroundColor: THEME.colors.card,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.borderDark,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnAddCatCircle: {
+    backgroundColor: THEME.colors.success,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allCategoriesModalContent: {
+    backgroundColor: THEME.colors.card,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+    borderRadius: 14,
+    width: '100%',
+    maxWidth: 320,
+    padding: 16,
+    maxHeight: 420,
+  },
+  allCategoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  allCategoryItemWrapper: {
+    width: '30%',
+    minWidth: 82,
+    position: 'relative',
+  },
+  deleteModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.4)',
+    backgroundColor: 'rgba(255,59,48,0.1)',
+    marginBottom: 14,
+    alignSelf: 'center',
+  },
+  deleteModeBtnActive: {
+    backgroundColor: THEME.colors.danger,
+    borderColor: THEME.colors.danger,
+  },
+  deleteModeBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.colors.danger,
+  },
+  emojiSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.borderDark,
+    backgroundColor: THEME.colors.inputBg,
+  },
+  emojiSelectorEmoji: {
+    fontSize: 32,
+  },
+  emojiSelectorLabel: {
+    fontSize: 12,
+    color: THEME.colors.textGray,
+  },
+  emojiPickerContent: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 20,
+    width: '88%',
+    maxWidth: 360,
+    alignSelf: 'center',
+  },
+  emojiInputPreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: THEME.colors.inputBg,
+    borderWidth: 2,
+    borderColor: THEME.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  emojiInputPreviewEmoji: {
+    fontSize: 44,
+  },
+  emojiInputContainer: {
+    backgroundColor: THEME.colors.inputBg,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.borderDark,
+  },
+  emojiInputField: {
+    fontSize: 36,
+    paddingVertical: 12,
+    color: THEME.colors.textWhite,
+  },
+  allCategoryItem: {
+    backgroundColor: THEME.colors.inputBg,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.borderDark,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  allCategoryEmoji: {
+    fontSize: 18,
+    marginBottom: 3,
+  },
+  allCategoryLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: THEME.colors.textWhite,
+    textAlign: 'center',
+  },
+  allCategoryCount: {
+    fontSize: 9,
+    color: THEME.colors.textGray,
+    marginTop: 1,
+  },
+  allCategoryCheck: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allCategoryDeleteBtn: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,59,48,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   productRowsListContainer: {
     gap: 10,
@@ -1157,6 +1619,97 @@ const styles = StyleSheet.create({
   modalBtnText: {
     color: THEME.colors.textWhite,
     fontWeight: '700',
+  },
+  sortModalContent: {
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+    borderRadius: 20,
+    width: '88%',
+    maxWidth: 320,
+    padding: 20,
+  },
+  sortModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  sortModalIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#22B15B18',
+    borderWidth: 1,
+    borderColor: '#22B15B30',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: THEME.colors.textWhite,
+  },
+  sortModalSubtitle: {
+    fontSize: 12,
+    color: THEME.colors.textGray,
+    marginTop: 2,
+  },
+  sortModalDivider: {
+    height: 1,
+    backgroundColor: THEME.colors.borderDark,
+    marginBottom: 14,
+  },
+  sortModalSectionLabel: {
+    color: THEME.colors.textGray,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sortOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: THEME.colors.inputBg,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    marginBottom: 6,
+  },
+  sortOptionItemActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: '#22B15B12',
+  },
+  sortOptionIcon: {
+    fontSize: 16,
+  },
+  sortOptionLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: THEME.colors.textWhite,
+  },
+  sortOptionCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: THEME.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortModalCloseBtn: {
+    width: '100%',
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+    alignItems: 'center',
   },
 
   // Edit Panel Screen Styles
