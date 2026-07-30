@@ -22,12 +22,11 @@ import {
   TrendingUp, 
   CalendarDays,
   Filter,
-  Hash,
   User,
-  FileText,
   CheckCircle2,
-  Copy,
-  Share2
+  Share2,
+  ChevronRight,
+  Circle
 } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -78,18 +77,18 @@ function formatDateHeader(key, timestamp) {
 }
 
 const METHOD_CONFIG = {
-  'Efectivo': { color: '#22B15B', bg: 'rgba(34,177,91,0.12)', icon: Banknote, emoji: '💵' },
-  'Yape': { color: '#A0C1F7', bg: 'rgba(160,193,247,0.12)', icon: Smartphone, emoji: '📱' },
-  'Plin': { color: '#00D4AA', bg: 'rgba(0,212,170,0.12)', icon: Smartphone, emoji: '💜' },
-  'Tarjeta': { color: '#FF9500', bg: 'rgba(255,149,0,0.12)', icon: CreditCard, emoji: '💳' },
+  'Efectivo': { color: '#22B15B', bg: 'rgba(34,177,91,0.12)', icon: Banknote },
+  'Yape': { color: '#A0C1F7', bg: 'rgba(160,193,247,0.12)', icon: Smartphone },
+  'Plin': { color: '#00D4AA', bg: 'rgba(0,212,170,0.12)', icon: Smartphone },
+  'Tarjeta': { color: '#FF9500', bg: 'rgba(255,149,0,0.12)', icon: CreditCard },
 };
 
 const FILTER_OPTIONS = [
   { key: 'all', label: 'Todas' },
-  { key: 'Efectivo', label: '💵 Efectivo' },
-  { key: 'Yape', label: '📱 Yape' },
-  { key: 'Plin', label: '💜 Plin' },
-  { key: 'Tarjeta', label: '💳 Tarjeta' },
+  { key: 'Efectivo', label: 'Efectivo' },
+  { key: 'Yape', label: 'Yape' },
+  { key: 'Plin', label: 'Plin' },
+  { key: 'Tarjeta', label: 'Tarjeta' },
 ];
 
 function BoletaContent({ sale }) {
@@ -497,6 +496,10 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
     }).length;
   }, [salesHistory]);
 
+  const totalFilteredAmount = useMemo(() => {
+    return filteredSales.reduce((sum, s) => sum + s.total, 0);
+  }, [filteredSales]);
+
   const methodBreakdown = useMemo(() => {
     const counts = { 'Efectivo': 0, 'Yape': 0, 'Plin': 0, 'Tarjeta': 0 };
     salesHistory.forEach(s => { if (counts[s.method] !== undefined) counts[s.method]++; });
@@ -526,13 +529,15 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
     setDetailVisible(true);
   };
 
+  const totalSales = salesHistory.reduce((sum, s) => sum + s.total, 0);
+
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.pageHeader}>
         <View>
           <Text style={styles.pageTitleText}>Mis Ventas</Text>
-          <Text style={styles.pageSubtitle}>{salesHistory.length} boletas registradas</Text>
+          <Text style={styles.pageSubtitle}>{salesHistory.length} boletas · S/ {totalSales.toFixed(2)} total</Text>
         </View>
         <View style={styles.headerDateBadge}>
           <CalendarDays size={14} color={THEME.colors.primary} />
@@ -547,26 +552,50 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, styles.statCardMain]}>
             <View style={styles.statCardTop}>
-              <TrendingUp size={18} color="#22B15B" />
-              <Text style={styles.statCardLabel}>Hoy</Text>
+              <TrendingUp size={16} color="#22B15B" />
+              <Text style={styles.statCardLabel}>Ventas de Hoy</Text>
             </View>
             <Text style={styles.statCardAmount}>S/ {totalInvoicedToday.toFixed(2)}</Text>
-            <Text style={styles.statCardSub}>{todayCount} venta{todayCount !== 1 ? 's' : ''}</Text>
+            <Text style={styles.statCardSub}>{todayCount} transaccion{todayCount !== 1 ? 'es' : ''}</Text>
           </View>
           <View style={styles.statCardSide}>
-            <View style={[styles.statCard, styles.statCardSmall]}>
-              <Text style={styles.statCardSmallEmoji}>💵</Text>
+            <View style={[styles.statCard, styles.statCardSmall, { borderLeftColor: '#22B15B', borderLeftWidth: 2 }]}>
               <Text style={styles.statCardSmallNum}>{methodBreakdown['Efectivo']}</Text>
               <Text style={styles.statCardSmallLabel}>Efectivo</Text>
             </View>
-            <View style={[styles.statCard, styles.statCardSmall]}>
-              <Text style={styles.statCardSmallEmoji}>📱</Text>
+            <View style={[styles.statCard, styles.statCardSmall, { borderLeftColor: '#A0C1F7', borderLeftWidth: 2 }]}>
               <Text style={styles.statCardSmallNum}>{methodBreakdown['Yape'] + methodBreakdown['Plin']}</Text>
               <Text style={styles.statCardSmallLabel}>Digital</Text>
+            </View>
+            <View style={[styles.statCard, styles.statCardSmall, { borderLeftColor: '#FF9500', borderLeftWidth: 2 }]}>
+              <Text style={styles.statCardSmallNum}>{methodBreakdown['Tarjeta']}</Text>
+              <Text style={styles.statCardSmallLabel}>Tarjeta</Text>
             </View>
           </View>
         </View>
       </TutorialStep>
+
+      {/* Summary Bar */}
+      {filteredSales.length > 0 && (
+        <View style={styles.summaryBar}>
+          <View style={styles.summaryBarItem}>
+            <Text style={styles.summaryBarNum}>{filteredSales.length}</Text>
+            <Text style={styles.summaryBarLabel}>ventas</Text>
+          </View>
+          <View style={styles.summaryBarDivider} />
+          <View style={styles.summaryBarItem}>
+            <Text style={styles.summaryBarNum}>S/ {totalFilteredAmount.toFixed(2)}</Text>
+            <Text style={styles.summaryBarLabel}>total</Text>
+          </View>
+          <View style={styles.summaryBarDivider} />
+          <View style={styles.summaryBarItem}>
+            <Text style={styles.summaryBarNum}>
+              {filteredSales.length > 0 ? 'S/ ' + (totalFilteredAmount / filteredSales.length).toFixed(2) : 'S/ 0.00'}
+            </Text>
+            <Text style={styles.summaryBarLabel}>promedio</Text>
+          </View>
+        </View>
+      )}
 
       {/* Filter Pills */}
       <View style={styles.filterSection}>
@@ -575,15 +604,19 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
           {FILTER_OPTIONS.map((f) => {
             const isActive = activeFilter === f.key;
             const count = f.key === 'all' ? salesHistory.length : (methodBreakdown[f.key] || 0);
+            const methodColor = f.key !== 'all' ? (METHOD_CONFIG[f.key]?.color || THEME.colors.textGray) : THEME.colors.primary;
             return (
               <TouchableOpacity
                 key={f.key}
-                style={[styles.filterPill, isActive && styles.filterPillActive]}
+                style={[styles.filterPill, isActive && { backgroundColor: methodColor + '20', borderColor: methodColor + '50' }]}
                 onPress={() => setActiveFilter(f.key)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>{f.label}</Text>
-                <View style={[styles.filterPillCount, isActive && styles.filterPillCountActive]}>
+                {f.key !== 'all' && (
+                  <Circle size={7} color={methodColor} fill={methodColor} />
+                )}
+                <Text style={[styles.filterPillText, isActive && { color: methodColor }]}>{f.label}</Text>
+                <View style={[styles.filterPillCount, isActive && { backgroundColor: methodColor + '30' }]}>
                   <Text style={[styles.filterPillCountText, isActive && { color: '#FFF' }]}>{count}</Text>
                 </View>
               </TouchableOpacity>
@@ -596,19 +629,19 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
       {groupedSales.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconCircle}>
-            <Receipt size={36} color={THEME.colors.textGray} />
+            <Receipt size={40} color={THEME.colors.textGray} />
           </View>
           <Text style={styles.emptyTitle}>Sin ventas</Text>
           <Text style={styles.emptySub}>
             {activeFilter !== 'all' 
-              ? `No hay ventas con método "${activeFilter}"`
+              ? `No hay ventas con el filtro "${activeFilter}"`
               : 'Las ventas aparecerán aquí cuando registres una'
             }
           </Text>
         </View>
       ) : (
         groupedSales.map((group) => (
-          <View key={group.key} style={{ marginTop: 22 }}>
+          <View key={group.key} style={{ marginTop: 24 }}>
             {/* Date Header */}
             <View style={styles.dateHeader}>
               <View style={styles.dateHeaderLine} />
@@ -616,7 +649,7 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
                 <Text style={styles.dateHeaderLabel}>{group.label}</Text>
                 <View style={styles.dateHeaderInfo}>
                   <Text style={styles.dateHeaderCount}>{group.count} venta{group.count !== 1 ? 's' : ''}</Text>
-                  <Text style={styles.dateHeaderDivider}>•</Text>
+                  <Text style={styles.dateHeaderDot}>•</Text>
                   <Text style={styles.dateHeaderTotal}>S/ {group.total.toFixed(2)}</Text>
                 </View>
               </View>
@@ -624,7 +657,7 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
             </View>
 
             {/* Sales */}
-            <View style={{ gap: 8, marginTop: 10 }}>
+            <View style={{ gap: 10, marginTop: 12 }}>
               {group.sales.map((s) => {
                 const method = METHOD_CONFIG[s.method] || METHOD_CONFIG['Efectivo'];
                 const MethodIcon = method.icon;
@@ -644,34 +677,41 @@ export default function SalesHistoryScreen({ salesHistory = [] }) {
                     <View style={styles.saleCardContent}>
                       <View style={styles.saleCardTop}>
                         <View style={[styles.saleCardMethodIcon, { backgroundColor: method.bg }]}>
-                          <MethodIcon size={16} color={method.color} />
+                          <MethodIcon size={18} color={method.color} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <View style={styles.saleCardIdRow}>
                             <Text style={styles.saleCardId}>{s.id}</Text>
-                            <View style={[styles.saleCardMethodPill, { backgroundColor: method.bg }]}>
+                            <View style={[styles.saleCardMethodPill, { backgroundColor: method.color + '18' }]}>
                               <Text style={[styles.saleCardMethodText, { color: method.color }]}>{s.method}</Text>
                             </View>
                           </View>
                           <View style={styles.saleCardMetaRow}>
                             <Clock size={10} color={THEME.colors.textGray} />
                             <Text style={styles.saleCardTime}>{relTime}</Text>
-                            <Text style={styles.saleCardDot}>•</Text>
-                            <Text style={styles.saleCardClient}>{s.client || 'General'}</Text>
+                            {s.client && s.client !== 'General' && (
+                              <>
+                                <Text style={styles.saleCardDot}>•</Text>
+                                <User size={10} color={THEME.colors.textGray} />
+                                <Text style={styles.saleCardClient}>{s.client}</Text>
+                              </>
+                            )}
                           </View>
                         </View>
                         <View style={styles.saleCardRight}>
                           <Text style={styles.saleCardTotal}>S/ {s.total.toFixed(2)}</Text>
-                          <Text style={styles.saleCardItems}>{s.items} u.</Text>
+                          <Text style={styles.saleCardItems}>{s.items} ítem{s.items !== 1 ? 's' : ''}</Text>
                         </View>
                       </View>
 
                       {/* Product Preview */}
                       {productNames ? (
                         <View style={styles.saleCardProductPreview}>
+                          <ShoppingBag size={11} color={THEME.colors.textGray} />
                           <Text style={styles.saleCardProductPreviewText} numberOfLines={1}>
                             {productNames}{moreProducts}
                           </Text>
+                          <ChevronRight size={12} color={THEME.colors.textGray} />
                         </View>
                       ) : null}
                     </View>
@@ -700,14 +740,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   pageTitleText: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: THEME.colors.textWhite,
+    letterSpacing: -0.5,
   },
   pageSubtitle: {
     fontSize: 13,
     color: THEME.colors.textGray,
-    marginTop: 3,
+    marginTop: 4,
   },
   headerDateBadge: {
     flexDirection: 'row',
@@ -717,21 +758,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(34,177,91,0.2)',
     borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
   },
   headerDateText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: THEME.colors.primary,
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
 
   // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   statCardMain: {
     flex: 1,
@@ -756,6 +798,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: THEME.colors.success,
     marginTop: 8,
+    letterSpacing: -0.5,
   },
   statCardSub: {
     fontSize: 12,
@@ -763,25 +806,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statCardSide: {
-    gap: 10,
+    gap: 8,
   },
   statCardSmall: {
-    width: 110,
+    width: 108,
     backgroundColor: THEME.colors.card,
     borderWidth: 1,
     borderColor: THEME.colors.borderDark,
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-  },
-  statCardSmallEmoji: {
-    fontSize: 20,
+    borderRadius: 12,
+    padding: 10,
   },
   statCardSmallNum: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: THEME.colors.textWhite,
-    marginTop: 4,
   },
   statCardSmallLabel: {
     fontSize: 10,
@@ -790,12 +828,48 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // Summary Bar
+  summaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 14,
+  },
+  summaryBarItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryBarNum: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: THEME.colors.textWhite,
+  },
+  summaryBarLabel: {
+    fontSize: 10,
+    color: THEME.colors.textGray,
+    fontWeight: '600',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  summaryBarDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 4,
+  },
+
   // Filter
   filterSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 20,
+    marginTop: 16,
   },
   filterPills: {
     gap: 6,
@@ -803,7 +877,7 @@ const styles = StyleSheet.create({
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: THEME.colors.card,
     borderWidth: 1,
     borderColor: THEME.colors.borderDark,
@@ -811,17 +885,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
   },
-  filterPillActive: {
-    backgroundColor: THEME.colors.primary,
-    borderColor: THEME.colors.primary,
-  },
   filterPillText: {
     fontSize: 12,
     fontWeight: '600',
     color: THEME.colors.textGray,
-  },
-  filterPillTextActive: {
-    color: '#FFF',
   },
   filterPillCount: {
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -830,9 +897,6 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     minWidth: 20,
     alignItems: 'center',
-  },
-  filterPillCountActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   filterPillCountText: {
     fontSize: 10,
@@ -844,21 +908,21 @@ const styles = StyleSheet.create({
   dateHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   dateHeaderLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
   dateHeaderBadge: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 18,
   },
   dateHeaderLabel: {
     fontSize: 13,
@@ -870,13 +934,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginTop: 2,
+    marginTop: 3,
   },
   dateHeaderCount: {
     fontSize: 10,
     color: THEME.colors.textGray,
   },
-  dateHeaderDivider: {
+  dateHeaderDot: {
     fontSize: 10,
     color: THEME.colors.textGray,
   },
@@ -889,10 +953,10 @@ const styles = StyleSheet.create({
   // Sale Cards
   saleCard: {
     flexDirection: 'row',
-    backgroundColor: THEME.colors.card,
+    backgroundColor: '#0E0E0E',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: THEME.colors.borderDark,
+    borderColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden',
   },
   saleCardAccent: {
@@ -908,8 +972,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   saleCardMethodIcon: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -923,6 +987,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: THEME.colors.textWhite,
+    letterSpacing: -0.3,
   },
   saleCardMethodPill: {
     paddingVertical: 2,
@@ -955,9 +1020,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   saleCardTotal: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: THEME.colors.textWhite,
+    letterSpacing: -0.3,
   },
   saleCardItems: {
     fontSize: 11,
@@ -965,15 +1031,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   saleCardProductPreview: {
-    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 8,
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 10,
     borderLeftWidth: 2,
-    borderLeftColor: 'rgba(255,255,255,0.08)',
+    borderLeftColor: 'rgba(255,255,255,0.06)',
   },
   saleCardProductPreviewText: {
+    flex: 1,
     fontSize: 11,
     color: THEME.colors.textGray,
     fontStyle: 'italic',
@@ -982,23 +1052,23 @@ const styles = StyleSheet.create({
   // Empty State
   emptyState: {
     alignItems: 'center',
-    padding: 50,
+    paddingVertical: 60,
   },
   emptyIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: THEME.colors.textWhite,
-    marginTop: 16,
+    marginTop: 18,
   },
   emptySub: {
     fontSize: 13,
@@ -1006,6 +1076,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
     lineHeight: 20,
+    paddingHorizontal: 20,
   },
 
   // Detail Modal - Boleta Ticket

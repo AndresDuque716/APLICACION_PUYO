@@ -25,7 +25,7 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
   const recentSales = safeSales.slice(0, 10);
 
   // Listado de productos con stock bajo (crítico)
-  const lowStockProducts = safeProducts.filter(p => p && p.stock > 0 && p.stock <= 5);
+  const lowStockProducts = safeProducts.filter(p => p && p.stock > 0 && p.stock <= (p.minStock || 5));
 
   const currentDate = new Date().toLocaleDateString('es-PE', {
     year: 'numeric', month: 'long', day: 'numeric'
@@ -303,7 +303,7 @@ export function generateHtmlReport(salesHistory, products, loggedUser, branchNam
               <td><strong>${p.barcode || p.id}</strong></td>
               <td>${p.avatar || '📦'} ${p.name}</td>
               <td>${p.category || 'General'}</td>
-              <td style="text-align: center; font-weight: 700; color: ${p.stock === 0 ? '#dc3545' : p.stock <= 5 ? '#ffc107' : '#28a745'};">
+              <td style="text-align: center; font-weight: 700; color: ${p.stock === 0 ? '#dc3545' : p.stock <= (p.minStock || 5) ? '#ffc107' : '#28a745'};">
                 ${p.stock} und.
               </td>
               <td style="text-align: right; font-weight: 700; color: #00A859;">S/ ${(p.price || 0).toFixed(2)}</td>

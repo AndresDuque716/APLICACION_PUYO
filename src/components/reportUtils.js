@@ -15,7 +15,7 @@ export function calculateSummaryMetrics(salesHistory = [], products = []) {
   
   const registeredCount = safeProducts.length;
   const outOfStockCount = safeProducts.filter(p => p && p.stock === 0).length;
-  const lowStockCount = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5).length;
+  const lowStockCount = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= (p.minStock || 5)).length;
   
   const totalValuation = safeProducts.reduce((sum, p) => sum + ((p?.price || 0) * (p?.stock || 0)), 0);
   const totalStockUnits = safeProducts.reduce((sum, p) => sum + (p?.stock || 0), 0);
@@ -123,7 +123,7 @@ export function generateRecommendations(salesHistory = [], products = []) {
   }
 
   // B. Recomendación de stock crítico
-  const lowStockList = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5);
+  const lowStockList = safeProducts.filter(p => p && typeof p.stock === 'number' && p.stock > 0 && p.stock <= (p.minStock || 5));
   if (lowStockList.length > 0) {
     const firstLow = lowStockList[0];
     recommendations.push(`📉 El producto ${firstLow.name} tiene pocas unidades (${firstLow.stock} restantes). Considera solicitar un pedido al proveedor.`);

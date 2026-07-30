@@ -51,7 +51,9 @@ Estructura del proyecto:
     theme.js                → THEME, STORAGE_KEYS, productos iniciales
   assets/
     Logo.mp4                → Video de splash
-    logo.png                → Logo vendix (vendixlogo.png)
+    logovendix.png          → Icono logo navbar (28x28)
+    txtvendix.png           → Texto logo navbar (72x16)
+    logo.png                → Logo vendix legacy
     yape-logo.png           → Logo Yape
     plin-logo.png           → Logo Plin
 
@@ -84,7 +86,206 @@ Animaciones recientes (Login):
   - Pulsa infinitamente (1→1.06→1, ciclo 1.8s)
   - Tarjeta de registro aparece desde abajo con fade
 
-Notas importantes:
+====================================================================
+  FIREBASE - ESTRUCTURA DETALLADA
+====================================================================
+
+1. Configuracion
+   - Archivo: src/config/firebase.js
+   - Proyecto: vendix-3cedd (Firebase)
+   - La app verifica si hay apiKey antes de inicializar
+   - isFirebaseConfigured booleano condicional:
+       si hay apiKey → Firebase real
+       si no → modo offline (solo AsyncStorage)
+
+2. Estructura Firestore
+   Cada usuario tiene datos aislados bajo:
+   users/{uid}/productos/{productId}
+   users/{uid}/sales/{saleId}
+   users/{uid}/categories/{categoryName}
+   users/{uid}/settings/branches
+   users/{uid} → documento raiz del usuario (opcional)
+
+   Reglas de seguridad (recomendadas):
+     match /users/{uid}/{document=**} {
+       allow read, write: if request.auth != null && request.auth.uid == uid;
+     }
+
+3. Sync Logic (App.js: loadUserDataForAccount)
+   a) Al iniciar sesion onAuthStateChanged:
+      - Lee AsyncStorage con claves PER-USER:
+        @vendix_products_{safeUser}
+        @vendix_sales_history_{safeUser}
+        @vendix_categories_{safeUser}
+        @vendix_custom_emojis_{safeUser}
+      - Luego sincroniza desde Firestore (sobrescribe local)
+   
+   b) Al completar venta (handleCompleteSale):
+      - Descuenta stock local y en Firestore
+      - Guarda la venta en users/{uid}/sales/{saleId}
+      - Actualiza productos modificados
+   
+   c) Al modificar productos (handleUpdateProductsList):
+      - Elimina en cloud los que ya no existen en local
+      - Escribe todos los actuales
+   
+   d) Categorias:
+      - handleAddCategory: escribe en Firestore doc con { emoji }
+      - handleDeleteCategory: elimina el doc en Firestore
+      - loadUserDataForAccount: al cargar, si no hay categorias
+        en cloud, siembra defaults (Bebidas, Snacks, Golosinas,
+        Abarrotes, Lacteos)
+
+4. Aislamiento de datos entre usuarios (data leak fix)
+   - Cada usuario tiene sus propias claves AsyncStorage
+   - safeUser = (email || 'guest').replace(/[^a-zA-Z0-9]/g, '_')
+   - Claves:
+     @vendix_products_{safeUser}
+     @vendix_sales_history_{safeUser}
+     @vendix_categories_{safeUser}
+     @vendix_custom_emojis_{safeUser}
+   - loadUserDataForAccount limpia estados (setProducts([]),
+     setSalesHistory([]), setCart([])) antes de cargar los nuevos
+   - Al cerrar sesion se borra loggedUser pero NO las claves
+     por usuario (quedan en AsyncStorage para la proxima)
+   - Al eliminar cuenta se barren todas las colecciones en
+     Firestore (products, sales, categories, settings) y se
+     borra el Auth user
+
+5. Offline-first hybrid
+   - Los datos siempre se guardan primero en AsyncStorage
+   - firebase es secundario (sobrescribe local al loguearse)
+   - Si no hay conexion o Firebase no configurado, la app
+     funciona igual solo con AsyncStorage
+   - Los UIDs para Firestore se obtienen asi:
+     auth.currentUser.uid → si hay sesion Firebase
+     email sanitizado → fallback (para invitados/demo)
+     'vendix_user_main' → ultimo recurso
+
+6. Colecciones Firestore por usuario:
+   products/{id}
+     { id, name, category, price, stock, minStock, barcode, image, avatar }
+   sales/{id}
+     { id, time, total, items, method, client, productsList,
+       timestamp }
+   categories/{name}
+     { emoji: '🥤' }
+   settings/branches
+     { selectedBranch, branches: ['Mi Sucursal', ...] }
+
+====================================================================
+  CAMBIOS RECIENTES (Julio 2026)
+====================================================================
+
+1. Categorias por usuario + Firebase
+   - Antes: categorias globales @vendix_categories (todos veian
+     las mismas categorias)
+   - Ahora: por usuario con claves @vendix_categories_{safeUser}
+     y @vendix_custom_emojis_{safeUser}
+   - Sincronizadas en Firestore bajo users/{uid}/categories/{name}
+   - Se siembran 5 categorias default al registrar nuevo usuario
+   - Eliminacion de categoria tambien borra el doc en Firestore
+
+2. Data leak corregido
+   - Al cambiar de cuenta (login/logout) se limpian los estados
+     antes de cargar los datos de la nueva cuenta
+   - loadUserDataForAccount hace setProducts([]) previo
+   - Al cerrar sesion se vacian estados globales
+
+3. Logo navbar reemplazado
+   - Antes: SVG + texto "Vendix" hardcodeado
+   - Ahora: logovendix.png (icono 28x28) + txtvendix.png (texto 72x16)
+   - Assets copiados a assets/
+
+4. Dashboard modernizado
+   - Layout mobile-first con padding 14 y CARD_GAP 12
+   - Greeting card con saludo + selector sucursal + filtro fecha
+   - KPIs 2x2 con accent colors y borderLeft coloreado
+   - KPI reemplazado: "Ganancias est. (30%)" → "Ticket promedio"
+   - Grafico semanal con barras, total semanal (sin datos demo)
+   - Seccion "Metodos de pago" con desglose por metodo y %
+   - Alertas: stock bajo, agotados, meta diaria (con badge count)
+   - Inventario summary: Productos, Categorias, Valorizacion total
+   - Accesos rapidos (Productos, Nueva venta, Ventas, Reportes)
+   - Modales scrollables (slide up para listas, fade para acciones)
+   - Filtro de fecha corregido: usa timestamp real (no string matching)
+
+5. Eliminacion de datos demo
+   - Eliminados INITIAL_PRODUCTS (8 items) e INITIAL_SALES (5 items)
+     de src/constants/theme.js
+   - Eliminadas todas las referencias e imports en App.js
+   - loadPersistedData ahora usa setProducts([])/setSalesHistory([])
+   - Grafico semanal ya NO usa valores fake [120,240,180,...]
+   - Safety: weeklyTotalSum = 0 si salesHistory esta vacio
+
+6. Migracion de datos legacy
+   - loadUserDataForAccount: migracion one-time por usuario
+   - Flag: @vendix_migration_v2_{safeUser}
+   - Limpia claves legacy: @vendix_products, @vendix_sales_history
+   - Limpia Firebase: users/{uid}/sales y users/{uid}/products
+   - Ejecutada automaticamente al iniciar sesion
+
+7. Stock minimo configurable por producto
+   - Nuevo campo "STOCK MINIMO" en formulario crear/editar producto
+   - Valor por defecto: 5 (compatible con productos existentes)
+   - Campo minStock guardado en el objeto producto
+   - Todas las alertas de stock bajo usan:
+     p.minStock || 5 en lugar de hardcoded 5
+   - Actualizado: DashboardScreen, ProductosScreen, reportUtils.js,
+     ReportTemplate.js
+
+8. Meta diaria editable
+   - Antes: DAILY_TARGET = 1500 (constante fija)
+   - Ahora: dailyTarget estado cargado desde AsyncStorage
+   - Clave: @vendix_daily_target
+   - Modal con circulo de porcentaje color-coded (rojo/naranja/verde)
+   - Boton lapiz para editar, guardar/cancelar inline
+   - Progress bar animada, stats (Ventas, Ticket Prom., Transacc.)
+   - Hint de "ventas restantes" basado en ticket promedio
+   - Mensajes motivacionales segun progreso
+
+9. Meta modal mejorado (ScrollView fix)
+   - Contenido envuelto en ScrollView para evitar overflow
+   - maxHeight cambiado a SCREEN_HEIGHT * 0.75
+   - Padding unificado a 20px, tamanos reducidos
+   - overflow: hidden en contenedor
+
+====================================================================
+  DashboardScreen - Layout detallado
+====================================================================
+  - container: flex 1, background #080808
+  - contentContainer: padding 14, gap 14
+  - greetingCard: row, 14px pad, icono Store + nombre + chip fecha
+  - kpiGrid: 2 columnas (flexDirection row, gap 12)
+  - kpiCard: borderLeft 3px colored, iconWrap 32x32, value 19px bold
+  - sectionCard: 18px radius, border #222, padding 14
+  - sectionHead: row con titulo + total (sin flex:1 ahora, juntos)
+  - chartBox: 140px height, chartY labels + chartCols bars
+  - alertRow: inputBg bg, icon 34x34, title + desc
+  - quickGrid: 4 columnas, quickBtn con icon 44x44
+  - modalFullOver: fondo oscuro, slide-up al 65% altura pantalla
+  - metaModal: Target icon grande + progress bar + ticket prom
+
+====================================================================
+  AsyncStorage Keys (completas)
+====================================================================
+  @vendix_products              → legacy (campo PRODUCTS)
+  @vendix_sales_history         → legacy
+  @vendix_cart                  → carrito actual
+  @vendix_logged_user           → email/identidad del usuario
+  @vendix_categories            → legacy
+  @vendix_selected_branch       → sucursal activa
+  @vendix_branches_list         → lista de sucursales
+  @vendix_store_prompted        → flag de primer inicio
+  @vendix_products_{safeUser}   → productos por usuario
+  @vendix_sales_history_{safeUser} → ventas por usuario
+  @vendix_categories_{safeUser}    → categorias por usuario
+   @vendix_custom_emojis_{safeUser} → emojis por usuario
+   @vendix_daily_target           → meta de ventas diaria
+   @vendix_migration_v2_{safeUser} → flag migracion one-time por usuario
+
+====================================================================
+  Notas importantes:
   - NO usar React Navigation, la navegacion es por estado
   - Firebase configurado para proyecto vendix-3cedd
   - El usuario prefiere cambios visuales/esteticos
@@ -92,3 +293,5 @@ Notas importantes:
   - App solo funciona en Android (no web)
   - expo-print para boletas (no react-native-view-shot)
   - Paquetes deben ser version SDK 54 compatible
+  - STORAGE_KEYS en theme.js tiene CATEGORIES legacy,
+    las keys reales se construyen con getUserCategoriesKey(email)

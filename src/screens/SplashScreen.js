@@ -29,7 +29,7 @@ export default function SplashScreen({ onFinish }) {
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <Video
         ref={videoRef}
-        source={require('../../assets/Logo.mp4')}
+        source={require('../../assets/vendix.mp4')}
         style={styles.video}
         resizeMode={ResizeMode.COVER}
         shouldPlay={false}

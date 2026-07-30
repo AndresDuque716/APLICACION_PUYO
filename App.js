@@ -8,15 +8,13 @@ import {
   Modal, 
   Alert, 
   Platform,
-  Vibration,
   Dimensions,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Path } from 'react-native-svg';
 import { CameraView, Camera } from 'expo-camera';
-import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   Home as HomeIcon, 
@@ -36,7 +34,7 @@ import {
 } from 'lucide-react-native';
 
 // Constants and Screens
-import { THEME, STORAGE_KEYS, INITIAL_PRODUCTS, INITIAL_SALES } from './src/constants/theme';
+import { THEME, STORAGE_KEYS } from './src/constants/theme';
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -46,6 +44,7 @@ import SalesHistoryScreen from './src/screens/SalesHistoryScreen';
 import NuevaVentaScreen from './src/screens/NuevaVentaScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import { TutorialProvider, useTutorial } from './src/components/TutorialProvider';
+import { playBeepSound, triggerBeepAndVibrate } from './src/utils/playBeepSound';
 import TutorialStep from './src/components/TutorialStep';
 import TutorialOverlay from './src/components/TutorialOverlay';
 import { auth, db, isFirebaseConfigured } from './src/config/firebase';
@@ -55,8 +54,7 @@ import {
   getDocs, 
   setDoc, 
   doc, 
-  deleteDoc, 
-  getDoc 
+  deleteDoc 
 } from 'firebase/firestore';
 
 import { logScreenView, logSaleAnalytics } from './src/config/analytics';
@@ -119,6 +117,8 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   const [products, setProducts] = useState([]);
   const [salesHistory, setSalesHistory] = useState([]);
   const [categories, setCategories] = useState(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
+  const DEFAULT_CATEGORY_EMOJIS = { 'Todos': '📋', 'Bebidas': '🥤', 'Snacks': '🥔', 'Golosinas': '🍫', 'Abarrotes': '🍚', 'Lácteos': '🥛', 'Limpieza': '🧼', 'Otros': '📦' };
+  const [categoryEmojis, setCategoryEmojis] = useState(DEFAULT_CATEGORY_EMOJIS);
   const [cart, setCart] = useState([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -211,33 +211,33 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        // Limpieza automática única para vaciar la app de datos demo anteriores
-        const storedProducts = await AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS);
-        if (storedProducts && JSON.parse(storedProducts).length > 0) {
-          setProducts(JSON.parse(storedProducts));
-        } else {
-          setProducts(INITIAL_PRODUCTS);
-          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
-        }
-
-        const storedSalesHistory = await AsyncStorage.getItem(STORAGE_KEYS.SALES_HISTORY);
-        if (storedSalesHistory && JSON.parse(storedSalesHistory).length > 0) {
-          setSalesHistory(JSON.parse(storedSalesHistory));
-        } else {
-          setSalesHistory(INITIAL_SALES);
-          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify(INITIAL_SALES));
-        }
+        setProducts([]);
+        setSalesHistory([]);
 
         const storedCart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
         if (storedCart) {
           setCart(JSON.parse(storedCart));
         }
 
-        const storedCategories = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORIES);
+        const storedUser = await AsyncStorage.getItem(STORAGE_KEYS.LOGGED_USER);
+        if (storedUser) {
+          setLoggedInUser(storedUser);
+          setEmail(storedUser);
+        }
+
+        // Load categories per-user (not global)
+        const loggedMail = storedUser || '';
+        const catKey = getUserCategoriesKey(loggedMail);
+        const emojiKey = getUserEmojisKey(loggedMail);
+        const storedCategories = await AsyncStorage.getItem(catKey);
         if (storedCategories) {
           setCategories(JSON.parse(storedCategories));
         } else {
-          await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']));
+          setCategories(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
+        }
+        const storedEmojis = await AsyncStorage.getItem(emojiKey);
+        if (storedEmojis) {
+          setCategoryEmojis({ ...DEFAULT_CATEGORY_EMOJIS, ...JSON.parse(storedEmojis) });
         }
 
         const storedSelected = await AsyncStorage.getItem('@vendix_selected_branch');
@@ -252,12 +252,6 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
           setBranches(JSON.parse(storedList));
         } else {
           await AsyncStorage.setItem('@vendix_branches_list', JSON.stringify(['Mi Sucursal']));
-        }
-
-        const storedUser = await AsyncStorage.getItem(STORAGE_KEYS.LOGGED_USER);
-        if (storedUser) {
-          setLoggedInUser(storedUser);
-          setEmail(storedUser);
         }
       } catch (error) {
         console.error('Error loading persisted data:', error);
@@ -283,6 +277,16 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     return `@vendix_sales_history_${safeUser}`;
   };
 
+  const getUserCategoriesKey = (userMail) => {
+    const safeUser = (userMail || 'guest').replace(/[^a-zA-Z0-9]/g, '_');
+    return `@vendix_categories_${safeUser}`;
+  };
+
+  const getUserEmojisKey = (userMail) => {
+    const safeUser = (userMail || 'guest').replace(/[^a-zA-Z0-9]/g, '_');
+    return `@vendix_custom_emojis_${safeUser}`;
+  };
+
   const loadUserDataForAccount = async (accountMail) => {
     if (!accountMail) return;
     try {
@@ -293,22 +297,38 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
 
       const prodKey = getUserProductsKey(accountMail);
       const salesKey = getUserSalesKey(accountMail);
+      const catKey = getUserCategoriesKey(accountMail);
+      const emojiKey = getUserEmojisKey(accountMail);
 
       // 2. Cargar almacenamiento local propio de esta cuenta
       const localProds = await AsyncStorage.getItem(prodKey);
       if (localProds && JSON.parse(localProds).length > 0) {
         setProducts(JSON.parse(localProds));
       } else {
-        setProducts(INITIAL_PRODUCTS);
-        await AsyncStorage.setItem(prodKey, JSON.stringify(INITIAL_PRODUCTS));
+        setProducts([]);
+        await AsyncStorage.setItem(prodKey, JSON.stringify([]));
       }
 
       const localSales = await AsyncStorage.getItem(salesKey);
       if (localSales && JSON.parse(localSales).length > 0) {
         setSalesHistory(JSON.parse(localSales));
       } else {
-        setSalesHistory(INITIAL_SALES);
-        await AsyncStorage.setItem(salesKey, JSON.stringify(INITIAL_SALES));
+        setSalesHistory([]);
+        await AsyncStorage.setItem(salesKey, JSON.stringify([]));
+      }
+
+      // Load per-user categories from local storage
+      const localCats = await AsyncStorage.getItem(catKey);
+      if (localCats && JSON.parse(localCats).length > 0) {
+        setCategories(JSON.parse(localCats));
+      } else {
+        setCategories(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
+      }
+      const localEmojis = await AsyncStorage.getItem(emojiKey);
+      if (localEmojis) {
+        setCategoryEmojis({ ...DEFAULT_CATEGORY_EMOJIS, ...JSON.parse(localEmojis) });
+      } else {
+        setCategoryEmojis(DEFAULT_CATEGORY_EMOJIS);
       }
 
       // 3. Sincronizar con Firestore de esta cuenta
@@ -316,6 +336,30 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
         const uid = (auth && auth.currentUser && auth.currentUser.uid) 
           ? auth.currentUser.uid 
           : accountMail.replace(/[^a-zA-Z0-9]/g, '_');
+
+        // Migración por usuario: limpiar datos demo legacy en AsyncStorage y Firestore
+        const safeUser = accountMail.replace(/[^a-zA-Z0-9]/g, '_');
+        const migKey = `@vendix_migration_v2_${safeUser}`;
+        const migDone = await AsyncStorage.getItem(migKey);
+        if (!migDone) {
+          // Limpiar AsyncStorage per-user
+          await AsyncStorage.setItem(prodKey, JSON.stringify([]));
+          await AsyncStorage.setItem(salesKey, JSON.stringify([]));
+          // Limpiar Firestore
+          const oldSalesSnap = await getDocs(collection(db, "users", uid, "sales"));
+          for (const d of oldSalesSnap.docs) {
+            await deleteDoc(doc(db, "users", uid, "sales", d.id));
+          }
+          const oldProdsSnap = await getDocs(collection(db, "users", uid, "products"));
+          for (const d of oldProdsSnap.docs) {
+            await deleteDoc(doc(db, "users", uid, "products", d.id));
+          }
+          // También limpiar claves legacy por si acaso
+          await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+          await AsyncStorage.setItem(STORAGE_KEYS.SALES_HISTORY, JSON.stringify([]));
+          await AsyncStorage.setItem(migKey, 'done');
+          console.log(`🧹 Migración v2 ejecutada para ${safeUser}`);
+        }
 
         const productsColRef = collection(db, "users", uid, "products");
         const productsSnapshot = await getDocs(productsColRef);
@@ -337,6 +381,32 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
 
         setSalesHistory(cloudSales);
         await AsyncStorage.setItem(salesKey, JSON.stringify(cloudSales));
+
+        // Load categories from Firestore
+        const catSnap = await getDocs(collection(db, "users", uid, "categories"));
+        if (!catSnap.empty) {
+          const cloudCats = [];
+          const cloudEmojis = {};
+          catSnap.forEach(d => {
+            cloudCats.push(d.id);
+            cloudEmojis[d.id] = d.data().emoji || '📦';
+          });
+          setCategories(['Todos', ...cloudCats]);
+          const fullEmojis = { ...DEFAULT_CATEGORY_EMOJIS, ...cloudEmojis };
+          setCategoryEmojis(fullEmojis);
+          await AsyncStorage.setItem(catKey, JSON.stringify(['Todos', ...cloudCats]));
+          await AsyncStorage.setItem(emojiKey, JSON.stringify(fullEmojis));
+        } else {
+          // Seed default categories for new user
+          const defaultCats = ['Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos'];
+          const defaultEmojis = { 'Bebidas': '🥤', 'Snacks': '🥔', 'Golosinas': '🍫', 'Abarrotes': '🍚', 'Lácteos': '🥛' };
+          for (const name of defaultCats) {
+            const emoji = defaultEmojis[name] || '📦';
+            await setDoc(doc(db, "users", uid, "categories", name), { emoji });
+          }
+          console.log("🌱 Categorías por defecto creadas para nuevo usuario en Firestore.");
+        }
+
         console.log(`☁️ Datos aislados y sincronizados correctamente para (${accountMail}).`);
       }
     } catch (err) {
@@ -365,6 +435,8 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
           setProducts([]);
           setSalesHistory([]);
           setCart([]);
+          setCategories(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
+          setCategoryEmojis(DEFAULT_CATEGORY_EMOJIS);
           AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER).catch(console.error);
         }
       });
@@ -435,25 +507,6 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     }
   };
 
-  const playBeepSound = async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav' }
-      );
-      await sound.playAsync();
-      setTimeout(() => {
-        sound.unloadAsync();
-      }, 1000);
-    } catch (e) {
-      console.log('Error playing sound:', e);
-    }
-  };
-
-  const triggerBeepAndVibrate = () => {
-    Vibration.vibrate(100);
-    playBeepSound();
-  };
-
   const handleBarcodeScanned = ({ type, data }) => {
     const now = Date.now();
     if (data === lastScannedBarcode && (now - lastScannedTimestamp) < 2000) {
@@ -485,6 +538,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       updatedCart.push({
         id: Date.now(),
         name: found ? found.name : data,
+        purchasePrice: found ? (found.purchasePrice || 0) : 0,
         price: found ? found.price : 4.50,
         qty: 1,
         avatar: found ? found.avatar : '📦'
@@ -525,6 +579,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       updatedCart.push({
         id: Date.now(),
         name: randProd.name,
+        purchasePrice: randProd.purchasePrice || 0,
         price: randProd.price,
         qty: 1,
         avatar: randProd.avatar
@@ -552,9 +607,10 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
       updatedCart.push({
         id: Date.now(),
         name: product.name,
+        purchasePrice: product.purchasePrice || 0,
         price: product.price,
         qty: 1,
-        avatar: product.avatar
+        avatar: product.avatar,
       });
     }
     saveCartState(updatedCart);
@@ -628,7 +684,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
         items: cart.reduce((sum, item) => sum + item.qty, 0),
         method: method,
         client: 'General',
-        productsList: cart.map(item => ({ name: item.name, qty: item.qty, price: item.price })),
+        productsList: cart.map(item => ({ name: item.name, qty: item.qty, price: item.price, purchasePrice: item.purchasePrice || 0 })),
         timestamp: Date.now()
       };
       const updatedSales = [newSale, ...salesHistory];
@@ -742,11 +798,20 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     }
   };
 
-  const handleAddCategory = async (newCatName) => {
+  const handleAddCategory = async (newCatName, emoji = '📦') => {
     try {
       const updatedCats = [...categories, newCatName];
       setCategories(updatedCats);
-      await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(updatedCats));
+      const updatedEmojis = { ...categoryEmojis, [newCatName]: emoji };
+      setCategoryEmojis(updatedEmojis);
+      const catKey = getUserCategoriesKey(loggedInUser);
+      const emojiKey = getUserEmojisKey(loggedInUser);
+      await AsyncStorage.setItem(catKey, JSON.stringify(updatedCats));
+      await AsyncStorage.setItem(emojiKey, JSON.stringify(updatedEmojis));
+      if (isFirebaseConfigured && db) {
+        const uid = auth?.currentUser?.uid || (loggedInUser ? loggedInUser.replace(/[^a-zA-Z0-9]/g, '_') : 'vendix_user_main');
+        await setDoc(doc(db, "users", uid, "categories", newCatName), { emoji });
+      }
     } catch (err) {
       console.error('Error adding category:', err);
     }
@@ -756,7 +821,16 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     try {
       const updatedCats = categories.filter(c => c !== catName);
       setCategories(updatedCats);
-      await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(updatedCats));
+      const { [catName]: _, ...restEmojis } = categoryEmojis;
+      setCategoryEmojis(restEmojis);
+      const catKey = getUserCategoriesKey(loggedInUser);
+      const emojiKey = getUserEmojisKey(loggedInUser);
+      await AsyncStorage.setItem(catKey, JSON.stringify(updatedCats));
+      await AsyncStorage.setItem(emojiKey, JSON.stringify(restEmojis));
+      if (isFirebaseConfigured && db) {
+        const uid = auth?.currentUser?.uid || (loggedInUser ? loggedInUser.replace(/[^a-zA-Z0-9]/g, '_') : 'vendix_user_main');
+        await deleteDoc(doc(db, "users", uid, "categories", catName));
+      }
     } catch (err) {
       console.error('Error deleting category:', err);
     }
@@ -786,6 +860,8 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
     setProducts([]);
     setSalesHistory([]);
     setCart([]);
+    setCategories(['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos']);
+    setCategoryEmojis(DEFAULT_CATEGORY_EMOJIS);
     await AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
     await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
     setSidebarOpen(false);
@@ -839,6 +915,13 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
               const salesSnapshot = await getDocs(salesColRef);
               for (const docSnap of salesSnapshot.docs) {
                 await deleteDoc(doc(db, "users", uid, "sales", docSnap.id));
+              }
+
+              // Borrar todas las categorías de Firestore
+              const catColRef = collection(db, "users", uid, "categories");
+              const catSnapshot = await getDocs(catColRef);
+              for (const docSnap of catSnapshot.docs) {
+                await deleteDoc(doc(db, "users", uid, "categories", docSnap.id));
               }
 
               // Borrar el documento principal del usuario
@@ -906,15 +989,15 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
              <Menu size={24} color={THEME.colors.textWhite} />
           </TouchableOpacity>
           
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <Path d="M3 16.5 L6.5 13.5 V21 H3 V16.5 Z" fill={THEME.colors.primary} />
-              <Path d="M8.5 11.5 L12 8.5 V21 H8.5 V11.5 Z" fill={THEME.colors.primary} />
-              <Path d="M14 6.5 L17.5 3.5 V21 H14 V6.5 Z" fill={THEME.colors.primary} />
-              <Path d="M2 18 L19.5 3" stroke={THEME.colors.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <Path d="M13.5 3 H19.5 V9" stroke={THEME.colors.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-            <Text style={styles.topBarLogoName}>Vendix</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Image 
+              source={require('./assets/logovendix.png')} 
+              style={{ height: 28, width: 28, resizeMode: 'contain' }} 
+            />
+            <Image 
+              source={require('./assets/txtvendix.png')} 
+              style={{ height: 16, width: 72, resizeMode: 'contain' }} 
+            />
           </View>
           
           <TouchableOpacity onPress={() => setNotificationsModalVisible(true)}>
@@ -957,6 +1040,7 @@ function VendixAppContent({ currentRoute, setCurrentRoute, loggedInUser, setLogg
           <ProductosScreen 
             products={products}
             categories={categories}
+            categoryEmojis={categoryEmojis}
             onAddProduct={handleAddProductFromCatalog} 
             onNewProductClick={() => setCurrentRoute('new-product')} 
             onUpdateProductsList={handleUpdateProductsList}

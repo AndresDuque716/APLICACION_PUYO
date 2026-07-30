@@ -14,17 +14,20 @@ import {
   SafeAreaView,
   Dimensions
 } from 'react-native';
-import { Camera as CameraIcon, ChevronDown, Check, X, Scan } from 'lucide-react-native';
+import { Camera as CameraIcon, ChevronDown, Check, X, Scan, DollarSign } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, Camera } from 'expo-camera';
 import { THEME } from '../constants/theme';
+import { triggerBeepAndVibrate } from '../utils/playBeepSound';
 
 export default function NuevoProductoScreen({ products = [], categories = [], onSave, onCancel }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Bebidas');
   const [barcode, setBarcode] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [minStock, setMinStock] = useState('');
   const [image, setImage] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
@@ -141,6 +144,7 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
   const handleBarcodeScanned = ({ type, data }) => {
     setBarcodeScannerVisible(false);
     setBarcode(data);
+    triggerBeepAndVibrate();
     Alert.alert('Código Escaneado', `Código de barras: ${data}`);
   };
 
@@ -148,6 +152,10 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
   const handleSubmit = () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Por favor, ingresa el nombre del producto.');
+      return;
+    }
+    if (!purchasePrice || parseFloat(purchasePrice) < 0 || isNaN(parseFloat(purchasePrice))) {
+      Alert.alert('Error', 'Por favor, ingresa un precio de compra válido.');
       return;
     }
     if (!price || parseFloat(price) < 0 || isNaN(parseFloat(price))) {
@@ -203,8 +211,10 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
       id: "PROD-" + Date.now().toString().slice(-4),
       name: name.trim(),
       category: category,
+      purchasePrice: parseFloat(purchasePrice),
       price: parseFloat(price),
       stock: parseInt(stock),
+      minStock: minStock ? parseInt(minStock) : 5,
       barcode: finalBarcode,
       image: finalImage,
       avatar: categoryAvatars[category] || '📦'
@@ -321,10 +331,23 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
             </View>
           </View>
 
-          {/* Precio y Stock */}
-          <View style={{ flexDirection: 'row', gap: 16 }}>
+          {/* Precio Compra, Precio Venta, Stock */}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.inputLabel}>PRECIO DE VENTA (S/)</Text>
+              <Text style={styles.inputLabel}>PRECIO COMPRA (S/)</Text>
+              <View style={styles.inputFieldContainer}>
+                <TextInput 
+                  placeholder="0.00" 
+                  placeholderTextColor={THEME.colors.textGray}
+                  style={styles.inputFieldOnly} 
+                  value={purchasePrice} 
+                  onChangeText={setPurchasePrice}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={styles.inputLabel}>PRECIO VENTA (S/)</Text>
               <View style={styles.inputFieldContainer}>
                 <TextInput 
                   placeholder="0.00" 
@@ -349,6 +372,32 @@ export default function NuevoProductoScreen({ products = [], categories = [], on
                 />
               </View>
             </View>
+          </View>
+
+          {/* Ganancias preview */}
+          {purchasePrice !== '' && price !== '' && !isNaN(parseFloat(purchasePrice)) && !isNaN(parseFloat(price)) && (
+            <View style={styles.profitRow}>
+              <DollarSign size={14} color={THEME.colors.primary} />
+              <Text style={styles.profitText}>
+                Ganancia por unidad: S/ {(parseFloat(price) - parseFloat(purchasePrice)).toFixed(2)}
+              </Text>
+            </View>
+          )}
+
+          {/* Stock mínimo */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>STOCK MÍNIMO</Text>
+            <View style={styles.inputFieldContainer}>
+              <TextInput 
+                placeholder="5" 
+                placeholderTextColor={THEME.colors.textGray}
+                style={styles.inputFieldOnly} 
+                value={minStock} 
+                onChangeText={setMinStock}
+                keyboardType="number-pad"
+              />
+            </View>
+            <Text style={{ color: THEME.colors.textGray, fontSize: 10, marginTop: 4 }}>Si el stock baja de este número, recibirás una alerta</Text>
           </View>
 
           {/* Botones de acción */}
@@ -517,6 +566,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     paddingHorizontal: 16,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: 'rgba(0, 210, 106, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 210, 106, 0.2)',
+  },
+  profitText: {
+    color: THEME.colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   btnPrimaryAction: {
     backgroundColor: THEME.colors.success,

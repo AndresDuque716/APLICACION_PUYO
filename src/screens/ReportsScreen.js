@@ -10,8 +10,7 @@ import {
   Modal,
   Alert
 } from 'react-native';
-import Svg, { Rect, G, Text as SvgText } from 'react-native-svg';
-import { ChevronLeft, TrendingUp, DollarSign, Award, CreditCard } from 'lucide-react-native';
+import { ChevronLeft, TrendingUp, DollarSign, Award } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
 import { generateAndSharePdfReport, sharePdfFile, previewOrPrintPdf, deleteGeneratedPdfReport } from '../components/pdfGenerator';

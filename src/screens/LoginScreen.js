@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
-import { User, Lock, Eye, EyeOff, Check, X, ArrowRight, Sparkles, Store, ShieldCheck, UserCheck } from 'lucide-react-native';
+import { User, Lock, Eye, EyeOff, Check, X, Sparkles, Store, ShieldCheck } from 'lucide-react-native';
 import { THEME } from '../constants/theme';
 
 import { auth, isFirebaseConfigured } from '../config/firebase';

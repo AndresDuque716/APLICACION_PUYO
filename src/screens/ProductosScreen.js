@@ -31,9 +31,9 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, Camera } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEME } from '../constants/theme';
 import TutorialStep from '../components/TutorialStep';
+import { triggerBeepAndVibrate } from '../utils/playBeepSound';
 
 const CATEGORY_EMOJIS = {
   'Todos': '📋',
@@ -51,6 +51,7 @@ const VISIBLE_CATEGORY_COUNT = 6;
 export default function ProductosScreen({ 
   products = [], 
   categories = ['Todos', 'Bebidas', 'Snacks', 'Golosinas', 'Abarrotes', 'Lácteos'],
+  categoryEmojis = {},
   onAddProduct, 
   onNewProductClick,
   onUpdateProductsList,
@@ -67,7 +68,6 @@ export default function ProductosScreen({
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const emojiInputRef = useRef(null);
   const tempEmojiRef = useRef('');
-  const [customEmojis, setCustomEmojis] = useState({});
   const [allCategoriesModalVisible, setAllCategoriesModalVisible] = useState(false);
   const [deleteCategoriesMode, setDeleteCategoriesMode] = useState(false);
 
@@ -75,9 +75,11 @@ export default function ProductosScreen({
   const [editingProduct, setEditingProduct] = useState(null);
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  const [editPurchasePrice, setEditPurchasePrice] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
   const [editBarcode, setEditBarcode] = useState('');
+  const [editMinStock, setEditMinStock] = useState('');
   const [editImage, setEditImage] = useState('');
   
   // Pickers & camera modals
@@ -95,17 +97,7 @@ export default function ProductosScreen({
     setCurrentPage(1);
   }, [categoriaActiva, searchQuery, sortBy]);
 
-  // Load custom emojis from storage
-  useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem('@vendix_custom_emojis');
-        if (saved) setCustomEmojis(JSON.parse(saved));
-      } catch (e) {}
-    })();
-  }, []);
-
-  const mergedEmojis = { ...CATEGORY_EMOJIS, ...customEmojis };
+  const mergedEmojis = { ...CATEGORY_EMOJIS, ...categoryEmojis };
 
   // Filter and Sort products dynamically
   const getSortedAndFilteredProducts = () => {
@@ -113,7 +105,7 @@ export default function ProductosScreen({
       const matchesCategory = categoriaActiva === 'Todos' || p.category === categoriaActiva;
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            p.barcode.includes(searchQuery);
+                            (p.barcode || '').includes(searchQuery);
       return matchesCategory && matchesSearch;
     });
 
@@ -146,10 +138,12 @@ export default function ProductosScreen({
     setEditingProduct(product);
     setEditName(product.name);
     setEditCategory(product.category);
+    setEditPurchasePrice((product.purchasePrice || 0).toString());
     setEditPrice(product.price.toString());
     setEditStock(product.stock.toString());
     setEditBarcode(product.barcode);
     setEditImage(product.image);
+    setEditMinStock((product.minStock || 5).toString());
   };
 
   // Quick direct delete action from row
@@ -200,6 +194,7 @@ export default function ProductosScreen({
   const handleBarcodeScanned = ({ type, data }) => {
     setBarcodeScannerVisible(false);
     setEditBarcode(data);
+    triggerBeepAndVibrate();
     Alert.alert('Código Escaneado', `Código asignado: ${data}`);
   };
 
@@ -287,6 +282,10 @@ export default function ProductosScreen({
       Alert.alert('Error', 'Por favor, ingresa el nombre.');
       return;
     }
+    if (!editPurchasePrice || parseFloat(editPurchasePrice) < 0 || isNaN(parseFloat(editPurchasePrice))) {
+      Alert.alert('Error', 'Por favor, ingresa un precio de compra válido.');
+      return;
+    }
     if (!editPrice || parseFloat(editPrice) < 0 || isNaN(parseFloat(editPrice))) {
       Alert.alert('Error', 'Por favor, ingresa un precio de venta válido.');
       return;
@@ -327,8 +326,10 @@ export default function ProductosScreen({
       ...editingProduct,
       name: editName.trim(),
       category: editCategory,
+      purchasePrice: parseFloat(editPurchasePrice),
       price: parseFloat(editPrice),
       stock: parseInt(editStock),
+      minStock: editMinStock ? parseInt(editMinStock) : 5,
       barcode: finalBarcode,
       image: finalImage,
       avatar: categoryAvatars[editCategory] || '📦'
@@ -352,12 +353,7 @@ export default function ProductosScreen({
       return;
     }
 
-    onAddCategory(nameClean);
-    
-    // Save emoji mapping
-    const updatedEmojis = { ...customEmojis, [nameClean]: selectedEmoji };
-    setCustomEmojis(updatedEmojis);
-    AsyncStorage.setItem('@vendix_custom_emojis', JSON.stringify(updatedEmojis));
+    onAddCategory(nameClean, selectedEmoji);
     
     setNewCategoryName('');
     setSelectedEmoji('📦');
@@ -504,7 +500,7 @@ export default function ProductosScreen({
           <View style={styles.productRowsListContainer}>
             {paginatedProducts.map((prod) => {
               const isOutOfStock = prod.stock === 0;
-              const isLowStock = prod.stock > 0 && prod.stock <= 5;
+              const isLowStock = prod.stock > 0 && prod.stock <= (prod.minStock || 5);
               return (
                 <View 
                   key={prod.id} 
@@ -554,7 +550,7 @@ export default function ProductosScreen({
                   <View style={styles.productListRightSection}>
                     <View style={styles.productRowStockBlock}>
                       <Text style={styles.stockLabelTitle}>Stock</Text>
-                      <Text style={prod.stock <= 5 ? styles.stockValueAlertNumber : styles.stockValueNormalNumber}>
+                      <Text style={prod.stock <= (prod.minStock || 5) ? styles.stockValueAlertNumber : styles.stockValueNormalNumber}>
                         {prod.stock}
                       </Text>
                     </View>
@@ -1021,10 +1017,23 @@ export default function ProductosScreen({
                   </View>
                 </View>
 
-                {/* Precio y Stock */}
-                <View style={{ flexDirection: 'row', gap: 16 }}>
+                {/* Precio Compra, Precio Venta, Stock */}
+                <View style={{ flexDirection: 'row', gap: 12 }}>
                   <View style={[styles.inputGroup, { flex: 1 }]}>
-                    <Text style={styles.inputLabel}>PRECIO DE VENTA (S/)</Text>
+                    <Text style={styles.inputLabel}>PRECIO COMPRA (S/)</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <TextInput 
+                        placeholder="0.00" 
+                        placeholderTextColor={THEME.colors.textGray}
+                        style={styles.inputFieldOnly} 
+                        value={editPurchasePrice} 
+                        onChangeText={setEditPurchasePrice}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>PRECIO VENTA (S/)</Text>
                     <View style={styles.inputFieldContainer}>
                       <TextInput 
                         placeholder="0.00" 
@@ -1048,6 +1057,29 @@ export default function ProductosScreen({
                         keyboardType="number-pad"
                       />
                     </View>
+                  </View>
+                </View>
+
+                {/* Ganancia preview */}
+                {editPurchasePrice !== '' && editPrice !== '' && !isNaN(parseFloat(editPurchasePrice)) && !isNaN(parseFloat(editPrice)) && (
+                  <View style={styles.profitRow}>
+                    <Text style={styles.profitText}>
+                      Ganancia por unidad: S/ {(parseFloat(editPrice) - parseFloat(editPurchasePrice)).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={[styles.inputGroup, { marginTop: 10 }]}>
+                  <Text style={styles.inputLabel}>STOCK MÍNIMO</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <TextInput 
+                      placeholder="5" 
+                      placeholderTextColor={THEME.colors.textGray}
+                      style={styles.inputFieldOnly} 
+                      value={editMinStock} 
+                      onChangeText={setEditMinStock}
+                      keyboardType="number-pad"
+                    />
                   </View>
                 </View>
 
@@ -1774,6 +1806,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     paddingHorizontal: 16,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: 'rgba(0, 210, 106, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 210, 106, 0.2)',
+  },
+  profitText: {
+    color: THEME.colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   btnPrimaryAction: {
     backgroundColor: THEME.colors.success,
